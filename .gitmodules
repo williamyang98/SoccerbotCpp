@@ -1,0 +1,11 @@
+[submodule "imgui_docking"]
+    path = vendor/imgui_docking
+    url = https://github.com/FiendChain/imgui_docking_cmake.git
+
+[submodule "tflite_c"]
+    path = vendor/tflite_c
+    url = https://github.com/FiendChain/tflitec_cmake_package.git
+
+[submodule "util"]
+    path = vendor/util
+    url = https://github.com/FiendChain/windows_bot_util.git
