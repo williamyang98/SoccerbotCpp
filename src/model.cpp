@@ -18,7 +18,9 @@ Model::Model(const char *filepath)
     // load model
     m_model = TfLiteModelCreateFromFile(filepath);
     m_options = TfLiteInterpreterOptionsCreate();
-    const uint32_t num_threads = std::thread::hardware_concurrency();
+    // const uint32_t num_threads = std::thread::hardware_concurrency();
+    // NOTE: disable threading since the overhead due to multithread is too high
+    const uint32_t num_threads = 1;
     TfLiteInterpreterOptionsSetNumThreads(m_options, num_threads);
     // Create the interpreter.
     m_interp = TfLiteInterpreterCreate(m_model, m_options);
