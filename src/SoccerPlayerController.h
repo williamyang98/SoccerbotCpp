@@ -6,6 +6,7 @@
 #include <atomic>
 
 #include "SoccerPlayer.h"
+#include "SoccerParams.h"
 
 class SoccerPlayerController
 {
@@ -31,17 +32,27 @@ private:
 public:
     SoccerPlayerController(
         std::unique_ptr<Model> &model,
-        std::shared_ptr<util::MSS> &mss);
+        std::shared_ptr<util::MSS> &mss,
+        std::shared_ptr<SoccerParams> &params);
     ~SoccerPlayerController();
-    Model::Result GetResult() const;
+
+    Prediction GetRawPrediction() const;
+    Prediction GetFilteredPrediction() const;
+
     bool GetIsRunning() const { return m_is_model_running; }
     void SetIsRunning(bool is_running) { m_is_model_running = is_running; }
     void SetPosition(const int top, const int left);
     Position GetPosition();
     uint8_t *GetResizeBuffer() { return m_player->GetResizeBuffer(); }
+
     inline int64_t GetFrameTimeMicroseconds() const { return m_us_frame_time; }
     inline int64_t GetForwardTimeMicroseconds() const { return m_us_forward_time; }
     inline int64_t GetParseTimeMicroseconds() const { return m_us_parse_time; }
+
+    inline bool GetIsTracking() const { return m_player->GetIsTracking(); }
+    inline bool GetIsClicking() const { return m_player->GetIsClicking(); }
+    inline void SetIsTracking(bool v) { m_player->SetIsTracking(v); }
+    inline void SetIsClicking(bool v) { m_player->SetIsClicking(v); }
 private:
     void ThreadLoop();
 };

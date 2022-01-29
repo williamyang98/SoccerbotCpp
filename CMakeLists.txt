@@ -17,8 +17,14 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(SRC_FILES
     src/main.cpp 
+    # neural network
     src/model.cpp src/missing.c 
-    src/App.cpp src/gui.cpp src/SoccerPlayer.cpp src/SoccerPlayerController.cpp
+    # soccer logic
+    src/App.cpp src/gui.cpp 
+    src/SoccerPlayer.cpp 
+    src/SoccerPlayerController.cpp 
+    src/Predictor.cpp
+    # utility
     vendor/util/MSS.cpp    
     vendor/util/KeyListener.cpp
     vendor/util/AutoGui.cpp)

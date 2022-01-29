@@ -5,16 +5,34 @@
 
 #include "model.h"
 #include "SoccerPlayerController.h"
+#include "SoccerParams.h"
 #include "util/MSS.h"
 #include "util/AutoGui.h"
 #include "util/KeyListener.h"
 
+void DrawRectInBuffer(
+    int cx, int cy, int wx, int wy,
+    const RGBA<uint8_t> pen_color, const int pen_width,
+    RGBA<uint8_t> *buffer, int width, int height, int row_stride);
 
 App::App(
     std::unique_ptr<Model> &model, 
     ID3D11Device *dx11_device, ID3D11DeviceContext *dx11_context)
 {
     m_mss = std::make_shared<util::MSS>();
+    m_params = std::make_shared<SoccerParams>();
+    {
+        auto &p = *m_params;
+        p.acceleration = 2.5f;
+        p.relative_ball_width = 0.24f;
+        p.additional_model_delay = 0.0f;
+        p.confidence_threshold = 0.5f;
+        p.max_lost_frames = 2;
+
+        p.height_trigger_soft = 0.7f;
+        p.fall_speed_trigger_soft = 0.0f;
+        p.fall_speed_trigger_hard = 0.2f;
+    }
 
     m_dx11_device = dx11_device;
     m_dx11_context = dx11_context;
@@ -35,17 +53,37 @@ App::App(
     }
 
     // create the player
-    m_player = std::make_unique<SoccerPlayerController>(model, m_mss);
+    m_player = std::make_unique<SoccerPlayerController>(model, m_mss, m_params);
 
-    m_is_tracking_ball = false;
     m_is_render_running = true;
     m_player->SetIsRunning(true);
     
     // create application bindings
     util::InitGlobalListener();
+
+    util::AttachKeyboardListener(VK_F1, [this](WPARAM type) {
+        if (type == WM_KEYDOWN) {
+            bool is_running = m_player->GetIsRunning();
+            m_player->SetIsRunning(!is_running);
+        }
+    });
+
+    util::AttachKeyboardListener(VK_F2, [this](WPARAM type) {
+        if (type == WM_KEYDOWN) {
+            m_is_render_running = !m_is_render_running;
+        }
+    });
+
     util::AttachKeyboardListener(VK_F3, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            m_is_tracking_ball = !m_is_tracking_ball;
+            bool is_tracking = m_player->GetIsTracking();
+            m_player->SetIsTracking(!is_tracking);
+        }
+    });
+    util::AttachKeyboardListener(VK_F4, [this](WPARAM type) {
+        if (type == WM_KEYDOWN) {
+            bool is_clicking = m_player->GetIsClicking();
+            m_player->SetIsClicking(!is_clicking);
         }
     });
 
@@ -64,22 +102,7 @@ void App::SetScreenshotSize(const int width, const int height) {
 }
 
 void App::Update() {
-    // non gui stuff here (for the moment)
-    if (m_is_tracking_ball) {
-        Model::Result result = m_player->GetResult();
-        if (result.confidence > 0.5f) {
-            // top and left are mixed up?
-            auto pos = m_player->GetPosition();
-            int x = pos.left;
-            int y = pos.top;
-
-            int dx = (int)(std::floor(result.x * (float)(m_screen_width)));
-            int dy = (int)(std::floor(result.y * (float)(m_screen_height)));
-            x = x + dx;
-            y = y + m_screen_height - dy;
-            util::SetCursorPosition(x, y);
-        }
-    }
+    // something do to here? 
 }
 
 App::TextureWrapper App::CreateTexture(const int width, const int height) {
@@ -126,7 +149,8 @@ void App::UpdateScreenshotTexture() {
 
     // setup dx11 to modify texture
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    m_dx11_context->Map(m_screenshot_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    const UINT subresource = 0;
+    m_dx11_context->Map(m_screenshot_texture, subresource, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
     // update texture from screen shotter
     int row_width = mappedResource.RowPitch / 4;
@@ -143,35 +167,33 @@ void App::UpdateScreenshotTexture() {
     }
 
     // render the bounding box of ball prediction
-    auto result = m_player->GetResult();
-    if (result.confidence > 0.5f) {
-        int cx = (int)((     result.x) * (float)buffer_size.x);
-        int cy = (int)((1.0f-result.y) * (float)buffer_size.y);
-        int wx = 50;
-        int wy = 50;
-        int px_start = std::max(cx-wx, 0);
-        int px_end   = std::min(cx+wx, buffer_size.x-1);
-        int py_start = std::max(cy-wy, 0);
-        int py_end   = std::min(cy+wy, buffer_size.y-1);
+    auto raw_pred = m_player->GetRawPrediction();
+    auto filtered_pred = m_player->GetFilteredPrediction();
 
-        // draw each of the line
-        const RGBA<uint8_t> pen_color = {255,0,0,255};
-        const int pen_width = 3;
-        for (int x = px_start; x <= px_end; x++) {
-            for (int j = 0; j < pen_width; j++) {
-                dst_buffer[x + (py_start+j)*row_width] = pen_color;
-                dst_buffer[x + (py_end  -j)*row_width] = pen_color;
-            }
-        }
-        for (int y = py_start; y <= py_end; y++) {
-            for (int j = 0; j < pen_width; j++) {
-                dst_buffer[px_start+j + y*row_width] = pen_color;
-                dst_buffer[px_end  -j + y*row_width] = pen_color;
-            }
-        }
+    int wx = (int)(m_params->relative_ball_width * buffer_size.x * 0.5f);
+    int wy = wx;
+    const int pen_width = (int)std::max(1.0f, 0.01f*buffer_size.x);
+    const RGBA<uint8_t> raw_color = {255,0,0,255};
+    const RGBA<uint8_t> filtered_color = {0,0,255,255};
+
+    if (raw_pred.confidence > m_params->confidence_threshold) {
+        int cx = (int)((     raw_pred.x) * buffer_size.x);
+        int cy = (int)((1.0f-raw_pred.y) * buffer_size.y);
+        DrawRectInBuffer(
+            cx, cy, wx, wy, 
+            raw_color, pen_width,
+            dst_buffer, buffer_size.x, buffer_size.y, row_width);
+    }
+    if (filtered_pred.confidence > m_params->confidence_threshold) {
+        int cx = (int)((     filtered_pred.x) * buffer_size.x);
+        int cy = (int)((1.0f-filtered_pred.y) * buffer_size.y);
+        DrawRectInBuffer(
+            cx, cy, wx, wy, 
+            filtered_color, pen_width,
+            dst_buffer, buffer_size.x, buffer_size.y, row_width);
     }
 
-    m_dx11_context->Unmap(m_screenshot_texture, 0);
+    m_dx11_context->Unmap(m_screenshot_texture, subresource);
 }
 
 void App::UpdateModelTexture() {
@@ -185,7 +207,8 @@ void App::UpdateModelTexture() {
 
     // setup dx11 to modify texture
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    m_dx11_context->Map(m_model_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    const UINT subresource = 0;
+    m_dx11_context->Map(m_model_texture, subresource, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 
     // update texture from screen shotter
     int row_width = mappedResource.RowPitch / 4;
@@ -202,33 +225,56 @@ void App::UpdateModelTexture() {
     }
 
     // render the bounding box of ball prediction
-    auto result = m_player->GetResult();
-    if (result.confidence > 0.5f) {
-        int cx = (int)((     result.x) * (float)buffer_size.x);
-        int cy = (int)((1.0f-result.y) * (float)buffer_size.y);
-        int wx = 50 / 4;
-        int wy = 50 / 4;
-        int px_start = std::max(cx-wx, 0);
-        int px_end   = std::min(cx+wx, buffer_size.x-1);
-        int py_start = std::max(cy-wy, 0);
-        int py_end   = std::min(cy+wy, buffer_size.y-1);
+    auto raw_pred = m_player->GetRawPrediction();
+    auto filtered_pred = m_player->GetFilteredPrediction();
 
-        // draw each of the line
-        const RGBA<uint8_t> pen_color = {255,0,0,255};
-        const int pen_width = 1;
-        for (int x = px_start; x <= px_end; x++) {
-            for (int j = 0; j < pen_width; j++) {
-                dst_buffer[x + (py_start+j)*row_width] = pen_color;
-                dst_buffer[x + (py_end  -j)*row_width] = pen_color;
-            }
-        }
-        for (int y = py_start; y <= py_end; y++) {
-            for (int j = 0; j < pen_width; j++) {
-                dst_buffer[px_start+j + y*row_width] = pen_color;
-                dst_buffer[px_end  -j + y*row_width] = pen_color;
-            }
-        }
+    int wx = (int)(m_params->relative_ball_width * buffer_size.x * 0.5f);
+    int wy = wx;
+    const int pen_width = (int)std::max(1.0f, 0.01f*buffer_size.x);
+    const RGBA<uint8_t> raw_color = {255,0,0,255};
+    const RGBA<uint8_t> filtered_color = {0,0,255,255};
+
+    if (raw_pred.confidence > m_params->confidence_threshold) {
+        int cx = (int)((     raw_pred.x) * buffer_size.x);
+        int cy = (int)((1.0f-raw_pred.y) * buffer_size.y);
+        DrawRectInBuffer(
+            cx, cy, wx, wy, 
+            raw_color, pen_width,
+            dst_buffer, buffer_size.x, buffer_size.y, row_width);
+    }
+    if (filtered_pred.confidence > m_params->confidence_threshold) {
+        int cx = (int)((     filtered_pred.x) * buffer_size.x);
+        int cy = (int)((1.0f-filtered_pred.y) * buffer_size.y);
+        DrawRectInBuffer(
+            cx, cy, wx, wy, 
+            filtered_color, pen_width,
+            dst_buffer, buffer_size.x, buffer_size.y, row_width);
     }
 
-    m_dx11_context->Unmap(m_model_texture, 0);
+    m_dx11_context->Unmap(m_model_texture, subresource);
+}
+
+void DrawRectInBuffer(
+    int cx, int cy, int wx, int wy,
+    const RGBA<uint8_t> pen_color, const int pen_width,
+    RGBA<uint8_t> *buffer, int width, int height, int row_stride)
+{
+    int px_start = std::clamp(cx-wx, 0          , width-pen_width);
+    int px_end   = std::clamp(cx+wx, pen_width-1, width-1);
+    int py_start = std::clamp(cy-wy, 0          , height-pen_width);
+    int py_end   = std::clamp(cy+wy, pen_width-1, height-1);
+
+    // draw each of the line
+    for (int x = px_start; x <= px_end; x++) {
+        for (int j = 0; j < pen_width; j++) {
+            buffer[x + (py_start+j)*row_stride] = pen_color;
+            buffer[x + (py_end  -j)*row_stride] = pen_color;
+        }
+    }
+    for (int y = py_start; y <= py_end; y++) {
+        for (int j = 0; j < pen_width; j++) {
+            buffer[px_start+j + y*row_stride] = pen_color;
+            buffer[px_end  -j + y*row_stride] = pen_color;
+        }
+    }
 }

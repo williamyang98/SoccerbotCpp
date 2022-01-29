@@ -9,6 +9,7 @@
 
 #include "model.h"
 #include "SoccerPlayerController.h"
+#include "SoccerParams.h"
 #include "util/MSS.h"
 
 class App
@@ -21,8 +22,8 @@ private:
 public:
     std::shared_ptr<util::MSS> m_mss;
     std::unique_ptr<SoccerPlayerController> m_player;
+    std::shared_ptr<SoccerParams> m_params;
     
-    bool m_is_tracking_ball;
     bool m_is_render_running;
     
     int m_texture_width, m_texture_height;

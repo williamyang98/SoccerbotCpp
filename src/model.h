@@ -2,6 +2,7 @@
 
 #include "tensorflow/lite/c/c_api.h"
 #include "tensorflow/lite/c/common.h"
+#include "Prediction.h"
 
 void LoadTfLiteModel(const char *filepath);
 
@@ -21,11 +22,6 @@ struct RGB {
 class Model
 {
 public:
-    struct Result {
-        float x;
-        float y;
-        float confidence;
-    };
     struct Vec2D {
         int x;
         int y;
@@ -36,7 +32,7 @@ private:
     TfLiteInterpreter *m_interp;
 
     RGB<float> *m_input_buffer;
-    Result m_result;
+    Prediction m_result;
 
     int m_width;
     int m_height;
@@ -50,7 +46,7 @@ public:
     void Parse();
     inline RGB<float> *GetInputBuffer() { return m_input_buffer; }
     inline Vec2D GetInputSize() const { return {m_width, m_height}; }
-    inline Result GetResult() const { return m_result; };
+    inline Prediction GetResult() const { return m_result; };
     void Print();
     void RunBenchmark(const int n=100);
 };

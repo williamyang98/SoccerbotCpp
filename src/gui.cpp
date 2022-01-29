@@ -10,7 +10,10 @@
 
 static void RenderControls(App &app);
 static void RenderStatistics(App &app);
+
 static void RenderModelView(App &app);
+static void RenderScreenImage(App &app);
+static void RenderModelImage(App &app);
 
 void RenderApp(App &app) {
     app.Update();
@@ -24,12 +27,24 @@ void RenderControls(App &app) {
     const auto screen_size = util::GetScreenSize();
 
     ImGui::Begin("Controls");
+
     bool is_model_running = player_controller->GetIsRunning();
-    if (ImGui::Checkbox("Is model", &is_model_running)) {
+    if (ImGui::Checkbox("Is model (F1)", &is_model_running)) {
         player_controller->SetIsRunning(is_model_running);
     }
-    ImGui::Checkbox("Is render", &app.m_is_render_running);
-    ImGui::Checkbox("Is tracking ball (F3)", &app.m_is_tracking_ball);
+
+    ImGui::Checkbox("Is render (F2)", &app.m_is_render_running);
+    
+    bool is_tracking = player_controller->GetIsTracking();
+    if (ImGui::Checkbox("Is tracking ball (F3)", &is_tracking)) {
+        player_controller->SetIsTracking(is_tracking);
+    }
+
+    bool is_clicking = player_controller->GetIsClicking();
+    if (ImGui::Checkbox("Is clicking ball (F4)", &is_clicking)) {
+        player_controller->SetIsClicking(is_clicking);
+    }
+    
 
     ImGui::Text("pointer = %p", app.m_screenshot_texture_view);
     ImGui::Text("model_size          = %d x %d", app.m_model_width, app.m_model_height);
@@ -50,6 +65,20 @@ void RenderControls(App &app) {
             app.SetScreenshotSize(screen_width, screen_height);
         }
     }
+
+    ImGui::Separator();
+    auto &p = *app.m_params;
+    ImGui::Text("Soccer parameters");
+    ImGui::DragFloat("acceleration", &p.acceleration, 0.1f, 0.0f, 10.0f);
+    ImGui::DragFloat("additional delay", &p.additional_model_delay, 0.001f, 0.0f, 0.5f);
+    ImGui::DragFloat("confidence threshold", &p.confidence_threshold, 0.01f, 0.0f, 1.0f);
+    ImGui::DragInt("max lost frames", &p.max_lost_frames, 1, 0, 5);
+
+    ImGui::Separator();
+    ImGui::Text("Triggers");
+    ImGui::DragFloat("fall speed soft", &p.fall_speed_trigger_soft, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("fall height soft", &p.height_trigger_soft, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("fall speed hard", &p.fall_speed_trigger_hard, 0.01f, 0.0f, 1.0f);
     
     ImGui::End(); 
 }
@@ -68,13 +97,13 @@ void RenderStatistics(App &app) {
     ImGui::End();
 }
 
-void RenderModelView(App &app) {
-    static auto last_mouse_pos = ImGui::GetMousePos();
-    static auto is_drag_enabled = false;
-    const auto screen_size = util::GetScreenSize();
 
+
+void RenderModelView(App &app) {
+    const auto screen_size = util::GetScreenSize();
     auto &player_controller = app.m_player;
-    Model::Result result = player_controller->GetResult();
+    auto raw_pred = player_controller->GetRawPrediction();
+    auto filtered_pred = player_controller->GetFilteredPrediction();
     auto screen_pos = player_controller->GetPosition();
 
     ImGui::Begin("Render");
@@ -88,30 +117,38 @@ void RenderModelView(App &app) {
     }
 
     ImGui::Text(
-        "x: %.2f, y: %.2f, confidence: %.2f", 
-        result.x, result.y, result.confidence);
+        "[raw]      x: %.2f, y: %.2f, confidence: %.2f", 
+        raw_pred.x, raw_pred.y, raw_pred.confidence);
+    ImGui::Text(
+        "[filtered] x: %.2f, y: %.2f, confidence: %.2f", 
+        filtered_pred.x, filtered_pred.y, filtered_pred.confidence);
 
     if (ImGui::BeginTabBar("Views")) {
         if (ImGui::BeginTabItem("Screen view")) {
-            static float zoom_scale = 1.0f;
-            ImGui::DragFloat("Scale", &zoom_scale, 0.001f, 0.1f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-            if (app.m_is_render_running) app.UpdateScreenshotTexture();
-            ImGui::Image(
-                (void*)app.m_screenshot_texture_view, 
-                ImVec2(app.m_texture_width*zoom_scale, app.m_texture_height*zoom_scale));
-            ImGui::EndTabItem();
+            RenderScreenImage(app);
         }
         if (ImGui::BeginTabItem("Model view")) {
-            static float zoom_scale = (float)(app.m_texture_width) / (float)(app.m_model_width);
-            ImGui::DragFloat("Scale", &zoom_scale, 0.001f, 0.1f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-            if (app.m_is_render_running) app.UpdateModelTexture();
-            ImGui::Image(
-                (void*)app.m_model_texture_view, 
-                ImVec2(app.m_model_width*zoom_scale, app.m_model_height*zoom_scale));
-            ImGui::EndTabItem();
+            RenderModelImage(app);
         }
         ImGui::EndTabBar();
     }
+    ImGui::End();
+} 
+
+void RenderScreenImage(App &app) {
+    static float zoom_scale = 1.0f;
+    static auto last_mouse_pos = ImGui::GetMousePos();
+    static auto is_drag_enabled = false;
+    const auto screen_size = util::GetScreenSize();
+    auto &player_controller = app.m_player;
+    auto screen_pos = player_controller->GetPosition();
+
+    ImGui::DragFloat("Scale", &zoom_scale, 0.001f, 0.1f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+    if (app.m_is_render_running) app.UpdateScreenshotTexture();
+    ImGui::Image(
+        (void*)app.m_screenshot_texture_view, 
+        ImVec2(app.m_texture_width*zoom_scale, app.m_texture_height*zoom_scale));
+    ImGui::EndTabItem();
 
     // create dragging controls for the image
     if (ImGui::IsItemHovered()) {
@@ -134,6 +171,43 @@ void RenderModelView(App &app) {
         }
     }
     last_mouse_pos = ImGui::GetMousePos();
+}
 
-    ImGui::End();
-} 
+void RenderModelImage(App &app) {
+    static float zoom_scale = (float)(app.m_screen_width) / (float)(app.m_model_width);
+    static auto last_mouse_pos = ImGui::GetMousePos();
+    static auto is_drag_enabled = false;
+    const auto screen_size = util::GetScreenSize();
+
+    auto &player_controller = app.m_player;
+    auto screen_pos = player_controller->GetPosition();
+
+    ImGui::DragFloat("Scale", &zoom_scale, 0.001f, 0.1f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+    if (app.m_is_render_running) app.UpdateModelTexture();
+    ImGui::Image(
+        (void*)app.m_model_texture_view, 
+        ImVec2(app.m_model_width*zoom_scale, app.m_model_height*zoom_scale));
+    ImGui::EndTabItem();
+
+    // create dragging controls for the image
+    if (ImGui::IsItemHovered()) {
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 10.0f)) {
+            is_drag_enabled = true;
+        }
+    } 
+    
+    if (is_drag_enabled) {
+        if (!ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+            is_drag_enabled = false;
+        } else {
+            auto latest_pos = ImGui::GetMousePos();
+            ImVec2 delta;
+            delta.x = latest_pos.x - last_mouse_pos.x;
+            delta.y = latest_pos.y - last_mouse_pos.y;
+            screen_pos.top   = std::clamp(screen_pos.top  - (int)(delta.y), 0, screen_size.height);
+            screen_pos.left  = std::clamp(screen_pos.left - (int)(delta.x), 0, screen_size.width);
+            player_controller->SetPosition(screen_pos.top, screen_pos.left);
+        }
+    }
+    last_mouse_pos = ImGui::GetMousePos();
+}

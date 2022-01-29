@@ -8,9 +8,10 @@
 
 SoccerPlayerController::SoccerPlayerController(
     std::unique_ptr<Model> &model,
-    std::shared_ptr<util::MSS> &mss) 
+    std::shared_ptr<util::MSS> &mss,
+    std::shared_ptr<SoccerParams> &params)
 {
-    m_player = std::make_unique<SoccerPlayer>(model, mss);
+    m_player = std::make_unique<SoccerPlayer>(model, mss, params);
     m_is_model_running = false;
     m_is_alive = true;
 
@@ -28,9 +29,17 @@ SoccerPlayerController::~SoccerPlayerController() {
     m_model_thread->join();
 }
 
-Model::Result SoccerPlayerController::GetResult() const {
+Prediction SoccerPlayerController::GetRawPrediction() const {
     if (m_is_model_running) {
-        return m_player->GetResult();
+        return m_player->GetRawPrediction();
+    } else {
+        return {0, 0, 0.0f};
+    }
+}
+
+Prediction SoccerPlayerController::GetFilteredPrediction() const {
+    if (m_is_model_running) {
+        return m_player->GetFilteredPrediction();
     } else {
         return {0, 0, 0.0f};
     }
