@@ -12,6 +12,11 @@
 
 class SoccerPlayer 
 {
+public: 
+    struct Vec2D {
+        float x; 
+        float y;
+    };
 private:
     std::unique_ptr<Model> m_model; 
     std::unique_ptr<Predictor> m_predictor;
@@ -35,6 +40,14 @@ private:
 
     std::atomic<bool> m_is_tracking;
     std::atomic<bool> m_is_clicking;
+
+    bool m_is_using_predictor;
+
+    bool m_is_soft_trigger;
+    bool m_is_hard_trigger;
+    bool m_can_track;
+    bool m_can_click;
+    Vec2D m_velocity;
 public:
     SoccerPlayer(
         std::unique_ptr<Model> &model,
@@ -49,9 +62,17 @@ public:
     Prediction GetFilteredPrediction();
 
     inline bool GetIsTracking() const { return m_is_tracking; }
-    inline bool GetIsClicking() const { return m_is_clicking; }
     inline void SetIsTracking(bool v) { m_is_tracking = v; }
+    inline bool GetIsClicking() const { return m_is_clicking; }
     inline void SetIsClicking(bool v) { m_is_clicking = v; }
+    inline bool GetIsUsingPredictor() const { return m_is_using_predictor; }
+    inline void SetIsUsingPredictor(bool v) { m_is_using_predictor = v; }
+    inline bool GetIsSoftTrigger() const { return m_is_soft_trigger; }
+    inline bool GetIsHardTrigger() const { return m_is_hard_trigger; }
+    inline bool GetCanTrack() const { return m_can_track; }
+    inline bool GetCanClick() const { return m_can_click; }
+
+    inline Vec2D GetVelocity() const { return m_velocity; }
 private:
     bool CheckIfClick(Prediction pred);
 };

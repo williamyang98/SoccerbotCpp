@@ -53,18 +53,20 @@ App::App(
     }
 
     // create the player
-    m_player = std::make_unique<SoccerPlayerController>(model, m_mss, m_params);
+    auto player = std::make_shared<SoccerPlayer>(model, m_mss, m_params);
+    m_player = std::make_unique<SoccerPlayerController>(player);
 
     m_is_render_running = true;
     m_player->SetIsRunning(true);
-    
+
+
     // create application bindings
     util::InitGlobalListener();
 
     util::AttachKeyboardListener(VK_F1, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool is_running = m_player->GetIsRunning();
-            m_player->SetIsRunning(!is_running);
+            bool v = m_player->GetIsRunning();
+            m_player->SetIsRunning(!v);
         }
     });
 
@@ -76,14 +78,22 @@ App::App(
 
     util::AttachKeyboardListener(VK_F3, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool is_tracking = m_player->GetIsTracking();
-            m_player->SetIsTracking(!is_tracking);
+            bool v = (*m_player)->GetIsTracking();
+            (*m_player)->SetIsTracking(!v);
         }
     });
+
     util::AttachKeyboardListener(VK_F4, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool is_clicking = m_player->GetIsClicking();
-            m_player->SetIsClicking(!is_clicking);
+            bool v = (*m_player)->GetIsClicking();
+            (*m_player)->SetIsClicking(!v);
+        }
+    });
+
+    util::AttachKeyboardListener(VK_F5, [this](WPARAM type) {
+        if (type == WM_KEYDOWN) {
+            bool v = (*m_player)->GetIsUsingPredictor();
+            (*m_player)->SetIsUsingPredictor(!v);
         }
     });
 

@@ -23,14 +23,14 @@ void RenderApp(App &app) {
 }
 
 void RenderControls(App &app) {
-    auto &player_controller = app.m_player;
+    auto &player_controller = *(app.m_player);
     const auto screen_size = util::GetScreenSize();
 
     ImGui::Begin("Controls");
 
-    bool is_model_running = player_controller->GetIsRunning();
+    bool is_model_running = player_controller.GetIsRunning();
     if (ImGui::Checkbox("Is model (F1)", &is_model_running)) {
-        player_controller->SetIsRunning(is_model_running);
+        player_controller.SetIsRunning(is_model_running);
     }
 
     ImGui::Checkbox("Is render (F2)", &app.m_is_render_running);
@@ -43,6 +43,11 @@ void RenderControls(App &app) {
     bool is_clicking = player_controller->GetIsClicking();
     if (ImGui::Checkbox("Is clicking ball (F4)", &is_clicking)) {
         player_controller->SetIsClicking(is_clicking);
+    }
+
+    bool is_using_predictor = player_controller->GetIsUsingPredictor();
+    if (ImGui::Checkbox("Is using predictor (F5)", &is_using_predictor)) {
+        player_controller->SetIsUsingPredictor(is_using_predictor);
     }
     
 
@@ -80,6 +85,15 @@ void RenderControls(App &app) {
     ImGui::DragFloat("fall height soft", &p.height_trigger_soft, 0.01f, 0.0f, 1.0f);
     ImGui::DragFloat("fall speed hard", &p.fall_speed_trigger_hard, 0.01f, 0.0f, 1.0f);
     
+    ImGui::Separator();
+    ImGui::Text("AI state");
+    auto vel = player_controller->GetVelocity();
+    ImGui::Text("Velocity: x=%.3f y=%.3f", vel.x, vel.y);
+    ImGui::Text("Soft trigger: %d", player_controller->GetIsSoftTrigger());
+    ImGui::Text("Hard trigger: %d", player_controller->GetIsHardTrigger());
+    ImGui::Text("Can track: %d", player_controller->GetCanTrack());
+    ImGui::Text("Can click: %d", player_controller->GetCanClick());
+
     ImGui::End(); 
 }
 

@@ -18,7 +18,7 @@ private:
     std::unique_ptr<std::thread> m_model_thread; 
     std::atomic<bool> m_is_model_running;
     std::atomic<bool> m_is_alive;
-    std::unique_ptr<SoccerPlayer> m_player;
+    std::shared_ptr<SoccerPlayer> m_player;
 
     std::atomic<int> m_top, m_left;
     std::mutex m_pos_mutex;
@@ -30,10 +30,7 @@ private:
     // time take to do a pass of the network
     std::atomic<int64_t> m_us_parse_time;
 public:
-    SoccerPlayerController(
-        std::unique_ptr<Model> &model,
-        std::shared_ptr<util::MSS> &mss,
-        std::shared_ptr<SoccerParams> &params);
+    SoccerPlayerController(std::shared_ptr<SoccerPlayer> &player);
     ~SoccerPlayerController();
 
     Prediction GetRawPrediction() const;
@@ -48,11 +45,9 @@ public:
     inline int64_t GetFrameTimeMicroseconds() const { return m_us_frame_time; }
     inline int64_t GetForwardTimeMicroseconds() const { return m_us_forward_time; }
     inline int64_t GetParseTimeMicroseconds() const { return m_us_parse_time; }
-
-    inline bool GetIsTracking() const { return m_player->GetIsTracking(); }
-    inline bool GetIsClicking() const { return m_player->GetIsClicking(); }
-    inline void SetIsTracking(bool v) { m_player->SetIsTracking(v); }
-    inline void SetIsClicking(bool v) { m_player->SetIsClicking(v); }
+    inline std::shared_ptr<SoccerPlayer> operator->() {
+        return m_player;
+    }
 private:
     void ThreadLoop();
 };

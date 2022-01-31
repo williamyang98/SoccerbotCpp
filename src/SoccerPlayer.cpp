@@ -26,8 +26,16 @@ SoccerPlayer::SoccerPlayer(
 
     m_has_prev_filtered_pred = false;
     
+    m_is_using_predictor = true;
+    
     m_is_tracking = false;
     m_is_clicking = false;
+    m_is_soft_trigger = false;
+    m_is_hard_trigger = false;
+    m_can_track = false;
+    m_can_click = false;
+    
+    m_velocity = {0.0f, 0.0f};
 }
 
 SoccerPlayer::~SoccerPlayer() {
@@ -87,18 +95,30 @@ bool SoccerPlayer::Update(const int top, const int left) {
     // play soccer
     float parse_time_secs = (float)(us_forward_time) / 1000000.0f;
     Prediction filtered_pred = m_predictor->Filter(raw_pred, parse_time_secs);
-    bool can_click = CheckIfClick(filtered_pred);
-    bool can_track = filtered_pred.confidence > m_params->confidence_threshold;
+    m_can_track = filtered_pred.confidence > m_params->confidence_threshold;
+    m_can_click = CheckIfClick(filtered_pred);
 
     // click on the ball
-    if (m_is_tracking && can_track) {
-        int x = left +                 (int)(filtered_pred.x * (float)(buffer_size.x));
-        int y = top  + buffer_size.y - (int)(filtered_pred.y * (float)(buffer_size.y));
-        util::SetCursorPosition(x, y);
-        if (m_is_clicking && can_click) {
-            util::Click(x, y, util::MouseButton::LEFT);
+    if (m_is_using_predictor) {
+        if (m_is_tracking && m_can_track) {
+            int x = left +                 (int)(filtered_pred.x * (float)(buffer_size.x));
+            int y = top  + buffer_size.y - (int)(filtered_pred.y * (float)(buffer_size.y));
+            util::SetCursorPosition(x, y);
+            if (m_is_clicking && m_can_click) {
+                util::Click(x, y, util::MouseButton::LEFT);
+            }
         }
-
+    // using raw model predictions
+    } else {
+        if (m_is_tracking && m_can_track) {
+            int x = left +                 (int)(raw_pred.x * (float)(buffer_size.x));
+            int y = top  + buffer_size.y - (int)(raw_pred.y * (float)(buffer_size.y));
+            util::SetCursorPosition(x, y);
+            //  raw model predictions dont use velocity information
+            if (m_is_clicking) {
+                util::Click(x, y, util::MouseButton::LEFT);
+            }
+        }
     }
 
     // update predictions
@@ -129,14 +149,24 @@ bool SoccerPlayer::CheckIfClick(Prediction pred) {
     if ((pred.x >= 1.0f) || (pred.x <= 0.0f) || 
         (pred.y >= 1.0f) || (pred.y <= 0.0f)) 
     {
+        m_is_soft_trigger = false;
+        m_is_hard_trigger = false;
+        m_velocity = {0.0f, 0.0f};
         return false;
     }
 
+    m_velocity = {dx, dy};
     // falling down and near bottom of screen
     // or falling down really fast regardless of position
-    if ((dy <= -p.fall_speed_trigger_soft && pred.y <= p.height_trigger_soft) || 
-        (dy <= -p.fall_speed_trigger_hard)) 
-    {
+    if ((dy <= -p.fall_speed_trigger_soft) && (pred.y <= p.height_trigger_soft)) {
+        m_is_soft_trigger = true;
+        m_is_hard_trigger = false;
+        return true;
+    }
+
+    if (dy <= -p.fall_speed_trigger_hard) {
+        m_is_soft_trigger = false;
+        m_is_hard_trigger = true;
         return true;
     }
     return false;

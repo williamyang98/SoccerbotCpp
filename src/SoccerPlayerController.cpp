@@ -7,11 +7,9 @@
 #include <windows.h>
 
 SoccerPlayerController::SoccerPlayerController(
-    std::unique_ptr<Model> &model,
-    std::shared_ptr<util::MSS> &mss,
-    std::shared_ptr<SoccerParams> &params)
+    std::shared_ptr<SoccerPlayer> &player)
 {
-    m_player = std::make_unique<SoccerPlayer>(model, mss, params);
+    m_player = player;
     m_is_model_running = false;
     m_is_alive = true;
 
