@@ -19,6 +19,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # enable address sanitizer for debug builds
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
 
 set(SRC_FILES
     src/main.cpp 
