@@ -9,3 +9,7 @@
 [submodule "util"]
     path = vendor/util
     url = https://github.com/FiendChain/windows_bot_util.git
+
+[submodule "fmt"]
+    path = vendor/fmt
+    url = https://github.com/fmtlib/fmt.git
