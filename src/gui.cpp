@@ -10,14 +10,16 @@
 
 static void RenderControls(App &app);
 static void RenderStatistics(App &app);
-
+static void RenderAIParameters(App &app);
 static void RenderModelView(App &app);
+
 static void RenderScreenImage(App &app);
 static void RenderModelImage(App &app);
 
 void RenderApp(App &app) {
     app.Update();
     RenderControls(app);
+    RenderAIParameters(app);
     RenderStatistics(app);
     RenderModelView(app);
 }
@@ -71,8 +73,15 @@ void RenderControls(App &app) {
         }
     }
 
-    ImGui::Separator();
-    auto &p = *app.m_params;
+    ImGui::End(); 
+}
+
+void RenderAIParameters(App &app) {
+    ImGui::Begin("AI Params");
+
+    auto &p = *(app.m_params);
+    auto &player_controller = *(app.m_player);
+
     ImGui::Text("Soccer parameters");
     ImGui::DragFloat("acceleration", &p.acceleration, 0.1f, 0.0f, 10.0f);
     ImGui::DragFloat("additional delay", &p.additional_model_delay, 0.001f, 0.0f, 0.5f);
@@ -94,7 +103,7 @@ void RenderControls(App &app) {
     ImGui::Text("Can track: %d", player_controller->GetCanTrack());
     ImGui::Text("Can click: %d", player_controller->GetCanClick());
 
-    ImGui::End(); 
+    ImGui::End();
 }
 
 void RenderStatistics(App &app) {
