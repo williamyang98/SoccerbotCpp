@@ -132,8 +132,8 @@ void RenderModelView(App &app) {
     ImGui::Begin("Render");
     {
         bool v = false;
-        v = v || ImGui::DragInt("Top", &screen_pos.top, 1, 0, screen_size.height);
-        v = v || ImGui::DragInt("Left", &screen_pos.left, 1, 0, screen_size.width);
+        v = ImGui::DragInt("Top", &screen_pos.top, 1, 0, screen_size.height) || v;
+        v = ImGui::DragInt("Left", &screen_pos.left, 1, 0, screen_size.width) || v;
         if (v) {
             player_controller->SetPosition(screen_pos.top, screen_pos.left);
         }
