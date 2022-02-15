@@ -38,14 +38,18 @@ int run_app(const char *filepath);
 // Main code
 int main(int argc, char **argv)
 {
+    const char *model_path = 
+        (argc <= 1) ? 
+        "./models/cnn_113_80_quantized.tflite" : argv[1];
+
     // load model
-    if (argc <= 1) {
+    if (argc >= 2 && (strncmp(argv[1], "help", 4) == 0)) {
         printf("Usage: %s <tflite_model>\n", argv[0]);
-        return 1;
+        return 0;
     }
 
     try {
-        return run_app(argv[1]);
+        return run_app(model_path);
     } catch (std::exception &ex) {
         std::cerr << ex.what() << std::endl;
     }
