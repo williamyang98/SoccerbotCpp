@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <memory>
+#include <thread>
 
 #include "App.h"
 #include "model.h"
@@ -33,7 +34,7 @@ void CreateRenderTarget();
 void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-int run_app(const char *filepath);
+int run_app(const char *filepath, const bool is_multithread);
 
 // Main code
 int main(int argc, char **argv)
@@ -48,8 +49,17 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    // check argument for number of threads for model
+    bool is_multithread = false;
+    for (int i = 0; i < argc; i++) {
+        if (strncmp(argv[i], "--multithread", 13) == 0) {
+            is_multithread = true;
+            break;
+        }
+    }
+
     try {
-        return run_app(model_path);
+        return run_app(model_path, is_multithread);
     } catch (std::exception &ex) {
         std::cerr << ex.what() << std::endl;
     }
@@ -57,8 +67,10 @@ int main(int argc, char **argv)
     return 1;
 }
 
-int run_app(const char *filepath) {
-    std::unique_ptr<Model> pModel = std::make_unique<Model>(filepath);
+int run_app(const char *filepath, const bool is_multithread) {
+    const uint32_t num_threads = is_multithread ? std::thread::hardware_concurrency() : 1;
+    printf("Starting model with %d threads\n", num_threads);
+    std::unique_ptr<Model> pModel = std::make_unique<Model>(filepath, num_threads);
 
     // Create application window
     //ImGui_ImplWin32_EnableDpiAwareness();

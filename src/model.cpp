@@ -13,14 +13,15 @@
 static void PrintTfLiteModelSummary(TfLiteInterpreter *interpreter);
 static void PrintTfLiteTensorSummary(const TfLiteTensor *tensor);
 
-Model::Model(const char *filepath)
+Model::Model(const char *filepath, uint32_t num_threads)
 {
     // load model
     m_model = TfLiteModelCreateFromFile(filepath);
     m_options = TfLiteInterpreterOptionsCreate();
-    // const uint32_t num_threads = std::thread::hardware_concurrency();
-    // NOTE: disable threading since the overhead due to multithread is too high
-    const uint32_t num_threads = 1;
+    // default number of threads is same as core count
+    if (num_threads <= 0) {
+        num_threads = std::thread::hardware_concurrency();
+    }
     TfLiteInterpreterOptionsSetNumThreads(m_options, num_threads);
     // Create the interpreter.
     m_interp = TfLiteInterpreterCreate(m_model, m_options);

@@ -39,7 +39,8 @@ private:
     int m_num_pixels;
     int m_channels;
 public:
-    Model(const char *filepath);
+    // num_threads <= 0 then use hardware concurrency amount
+    Model(const char *filepath, uint32_t num_threads=0);
     ~Model();
     // need to do a mapping to uint8_t to float
     bool CopyDataToInput(const uint8_t *data, const int width, const int height);
