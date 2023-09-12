@@ -17,9 +17,12 @@ find_package(imgui_docking CONFIG REQUIRED)
 # define our target
 set(CMAKE_CXX_STANDARD 17)
 
-# enable address sanitizer for debug builds
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+# enable address sanitizer for debug builds in MSVC compiler
+if(MSVC)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+    add_compile_options(/MP)
+endif()
 
 set(SRC_FILES
     src/main.cpp 
@@ -41,7 +44,6 @@ target_link_libraries(main PRIVATE
     tflitec imgui_docking 
     fmt::fmt
     "d3d11.lib" "dxgi.lib" "d3dcompiler.lib") 
-target_compile_options(main PRIVATE "/MP")
 
 # vcpkg.cmake has internal stuff that autogenerates this
 # we have to do this manually
