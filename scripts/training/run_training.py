@@ -2,14 +2,15 @@ if __name__ == "__main__":
     import argparse
     DEFAULT_MODEL_PATH = "./models/model_train.h5f"
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Run model training", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--asset-path", type=str, default="../assets/", help="Path to game assets")
     parser.add_argument("--model-in", type=str, default=DEFAULT_MODEL_PATH, help="Input path for pretrained model")
     parser.add_argument("--model-out", type=str, default=DEFAULT_MODEL_PATH, help="Output path for trained model")
-    parser.add_argument("--epochs", type=int, default=10, help="Total epochs to train model")
+    parser.add_argument("--epochs", type=int, default=100, help="Total epochs to train model")
     parser.add_argument("--steps-per-epoch", type=int, default=20, help="Total steps per epochs")
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
     parser.add_argument("--total-parallel-load", type=int, default=0, help="Number of threads to spawn for generating data set")
+    parser.add_argument("--learning-rate", type=float, default=1e-3, help="ADAM learning rate")
     parser.add_argument("--device", type=str, default="GPU:0", choices=["CPU", "GPU:0"], help="Device to use for training")
     parser.add_argument("--print-model-summary", action="store_true", help="Print model summary before training")
     args = parser.parse_args()
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         pos_err = tf.math.reduce_sum(pos_err, axis=1)
         pos_err = tf.math.reduce_mean(pos_err)
         
-        W0 = 4.0
+        W0 = 15.0
         net_err = cat_err + W0*pos_err
         return net_err
         
@@ -149,11 +150,7 @@ if __name__ == "__main__":
         model.summary()
 
     # training setup
-    hyperparams = {
-        "init_lr": 1e-3, 
-    }
-
-    optimizer = tf.keras.optimizers.Adam(learning_rate=hyperparams["init_lr"])
+    optimizer = tf.keras.optimizers.Adam(learning_rate=args.learning_rate)
 
     model.compile(
         loss=custom_loss_fn, 

@@ -1,6 +1,6 @@
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Quantize h5f model to tensorflow lite", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--model-in", type=str, default="./models/model_train.h5f", help="Input path for trained model")
     parser.add_argument("--model-out", type=str, default="./models/quant_out.tflite", help="Output path for quantized model")
     parser.add_argument("--asset-path", type=str, default="../assets/", help="Path to game assets")
