@@ -83,14 +83,42 @@ if __name__ == "__main__":
                 )
             )
     
-    class DatasetAugmentation:
-        def __call__(self, image, label, training=True):
-            from tensorflow.keras.layers.experimental import preprocessing
-            data_augmentation = tf.keras.Sequential([
-                preprocessing.RandomContrast(0.3),
-            ])
-            image = data_augmentation(image, training=training)
+    def dataset_augment(image, label, training=True):
+        def flip_vertical(image, label):
+            image = tf.reverse(image, [0])
+            confidence = label[2]
+            label = tf.math.multiply(tf.constant([1.0,-1.0,1.0]), label)
+            label = tf.math.add(tf.constant([0.0,1.0,0.0]), label)
+            label = label*confidence
             return image, label
+
+        def flip_horizontal(image, label):
+            image = tf.reverse(image, [1])
+            confidence = label[2]
+            label = tf.math.multiply(tf.constant([-1.0,1.0,1.0]), label)
+            label = tf.math.add(tf.constant([1.0,0.0,0.0]), label)
+            label = label*confidence
+            return image, label
+
+        def get_random(threshold=0.5):
+            uniform_random = tf.random.uniform(shape=[], minval=0, maxval=1.0)
+            return tf.math.less(uniform_random, threshold)
+
+        assert image.get_shape().ndims == 3, "Image must be in format (W,H,C)"
+        from tensorflow.keras.layers import RandomContrast, RandomBrightness
+        data_augmentation = tf.keras.Sequential([
+            RandomContrast(0.3),
+            RandomBrightness((-0.3,0.3), value_range=(0.0,1.0)),
+        ])
+        image = data_augmentation(image, training=training)
+
+        if not training:
+            return image, label
+
+        image, label = tf.cond(get_random(), lambda: flip_vertical(image, label), lambda: (image, label))
+        image, label = tf.cond(get_random(), lambda: flip_horizontal(image, label), lambda: (image, label))
+        return image, label
+
 
     def create_model():
         from model import SoccerBotModel
@@ -135,12 +163,11 @@ if __name__ == "__main__":
         bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         cat_err = bce(true_cls, pred_cls)
         
-        # NOTE: use L1 distance instead of L2, this works better
-        pos_err = tf.math.abs(true_pos-pred_pos)
+        pos_err = tf.math.square(true_pos-pred_pos)
         pos_err = tf.math.reduce_sum(pos_err, axis=1)
         pos_err = tf.math.reduce_mean(pos_err)
         
-        W0 = 15.0
+        W0 = 10.0
         net_err = cat_err + W0*pos_err
         return net_err
         
@@ -163,21 +190,24 @@ if __name__ == "__main__":
         print(f"Loaded weights from '{args.model_in}'")
     except Exception as ex:
         print(f"Failed to load in weights from '{args.model_in}': {ex}")
-    
-    ds_augment = DatasetAugmentation()
+     
     dataset = tf.data.Dataset.range(TOTAL_DATA_THREADS)
     dataset = dataset.interleave(
-        lambda _: ArtificialDataset(),
+        lambda _: ArtificialDataset().map(dataset_augment),
         num_parallel_calls=tf.data.AUTOTUNE
     )
     dataset = dataset.batch(args.batch_size)
-    dataset= dataset.map(ds_augment, num_parallel_calls=tf.data.AUTOTUNE)
     
     print(f"Start of training")
     is_save_weights = True
     try:
         with tf.device(f"/device:{args.device}"):
-            model.fit(dataset, steps_per_epoch=args.steps_per_epoch, epochs=args.epochs)
+            model.fit(
+                dataset, 
+                steps_per_epoch=args.steps_per_epoch, 
+                epochs=args.epochs,
+                use_multiprocessing=True
+            )
     except KeyboardInterrupt:
         print(f"Interrupted training early")
         response = input("Do you want to save weights? [Y/N]: ")
