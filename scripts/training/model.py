@@ -25,10 +25,10 @@ class SoccerBotModel(tf.Module):
         self.maxpool_3 = MaxPooling2D((3,3))
 
         self.flatten_5 = Flatten()
-        self.dense_5 = Dense(128)
+        self.dense_5 = Dense(64)
         self.relu_5 = ReLU()
 
-        self.dense_6 = Dense(64)
+        self.dense_6 = Dense(32)
         self.relu_6 = ReLU()
 
         self.dense_7 = Dense(3)
