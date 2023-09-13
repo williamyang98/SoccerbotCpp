@@ -12,3 +12,6 @@ A bot for playing facebook soccer
 2. ```CC=clang CXX=clang++ ./cmake_configure.sh```
 3. ```ninja -C build```
 4. ```./build/main.exe```
+
+# Training and emulator
+Refer to ```scripts/README.md``` for instructions to train models and run emulator.
