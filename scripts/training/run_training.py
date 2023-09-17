@@ -9,10 +9,12 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=100, help="Total epochs to train model")
     parser.add_argument("--steps-per-epoch", type=int, default=20, help="Total steps per epochs")
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
-    parser.add_argument("--total-parallel-load", type=int, default=0, help="Number of threads to spawn for generating data set")
+    parser.add_argument("--total-parallel-load", type=int, default=4, help="Number of threads to spawn for generating data set")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="ADAM learning rate")
+    parser.add_argument("--downscale", type=float, default=4, help="Amount to downscale the input by")
     parser.add_argument("--device", type=str, default="GPU:0", choices=["CPU", "GPU:0"], help="Device to use for training")
     parser.add_argument("--print-model-summary", action="store_true", help="Print model summary before training")
+    parser.add_argument("--no-autosave", action="store_true", help="Disables saving model checkpoints automatically")
     args = parser.parse_args()
 
     import os
@@ -46,10 +48,9 @@ if __name__ == "__main__":
     config.set_score_font(os.path.join(args.asset_path, "fonts/segoeuil.ttf"), 92)
     generator = BasicSampleGenerator(config)
 
-    IMAGE_DOWNSCALE = 4
     image, bounding_box, has_ball = generator.create_sample()
     image = image.convert("RGB")
-    image = image.resize((int(x/IMAGE_DOWNSCALE) for x in image.size))
+    image = image.resize((int(x/args.downscale) for x in image.size))
     im_width, im_height = image.size
     im_channels = 3
 
@@ -61,7 +62,7 @@ if __name__ == "__main__":
 
                 image, bounding_box, has_ball = generator.create_sample()
                 image = image.convert("RGB")
-                image = image.resize((int(x/IMAGE_DOWNSCALE) for x in image.size))
+                image = image.resize((int(x/args.downscale) for x in image.size))
                 
                 x_in = np.asarray(image)
                 x_in = x_in.astype(np.float32) / 255.0
@@ -160,14 +161,17 @@ if __name__ == "__main__":
         true_pos = y_true[:,:2]
         pred_pos = y_pred[:,:2]
 
-        bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        cat_err = bce(true_cls, pred_cls)
+        cat_err = tf.math.abs(true_cls-pred_cls)
+        cat_err = tf.math.reduce_mean(cat_err)
         
-        pos_err = tf.math.square(true_pos-pred_pos)
+        # NOTE: L1 distance is better since we have coordinates between 0 and 1
+        pos_err = tf.math.abs(true_pos-pred_pos)
         pos_err = tf.math.reduce_sum(pos_err, axis=1)
+        # Ignore error from non ball samples
+        pos_err = tf.math.multiply(pos_err, true_cls)
         pos_err = tf.math.reduce_mean(pos_err)
         
-        W0 = 10.0
+        W0 = 1.0
         net_err = cat_err + W0*pos_err
         return net_err
         
@@ -184,6 +188,23 @@ if __name__ == "__main__":
         optimizer=optimizer,
         metrics=[detect_accuracy, position_accuracy]
     )
+    
+    model_callbacks = []
+    lr_callback = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2, patience=5)
+    model_callbacks.append(lr_callback)
+    
+    IS_AUTOSAVE = not args.no_autosave
+    if IS_AUTOSAVE:
+        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath=args.model_out,
+            save_best_only=True,
+            save_weights_only=True,
+            monitor='loss',
+            mode='min',
+            verbose=1
+        )
+        model_callbacks.append(checkpoint_callback)
+        print(f"Autosaving checkpoints to {args.model_out}")
 
     try:
         model.load_weights(args.model_in)
@@ -199,14 +220,14 @@ if __name__ == "__main__":
     dataset = dataset.batch(args.batch_size)
     
     print(f"Start of training")
-    is_save_weights = True
+    is_save_weights = not IS_AUTOSAVE
     try:
         with tf.device(f"/device:{args.device}"):
             model.fit(
                 dataset, 
                 steps_per_epoch=args.steps_per_epoch, 
                 epochs=args.epochs,
-                use_multiprocessing=True
+                callbacks=model_callbacks
             )
     except KeyboardInterrupt:
         print(f"Interrupted training early")

@@ -4,6 +4,7 @@ if __name__ == '__main__':
     parser.add_argument("--model-in", type=str, default="./models/model_train.h5f", help="Input path for trained model")
     parser.add_argument("--model-out", type=str, default="./models/quant_out.tflite", help="Output path for quantized model")
     parser.add_argument("--asset-path", type=str, default="../assets/", help="Path to game assets")
+    parser.add_argument("--downscale", type=float, default=4, help="Amount to downscale the input by")
     args = parser.parse_args()
 
     # get the generator config
@@ -26,10 +27,9 @@ if __name__ == '__main__':
     config.set_score_font(os.path.join(args.asset_path, "fonts/segoeuil.ttf"), 92)
     generator = BasicSampleGenerator(config)
 
-    IMAGE_DOWNSCALE = 4
     image, bounding_box, has_ball = generator.create_sample()
     image = image.convert("RGB")
-    image = image.resize((int(x/IMAGE_DOWNSCALE) for x in image.size))
+    image = image.resize((int(x/args.downscale) for x in image.size))
     im_width, im_height = image.size
     im_channels = 3
 
