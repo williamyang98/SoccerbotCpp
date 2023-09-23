@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
         .required()
         .help("Path to model to load");
     parser.add_argument("--runtime")
-        .default_value(std::string("onnx"))
+        .default_value(std::string("tflite"))
         .required()
         .help("Type of runtime for model. Options: [onnx, tflite]");
     parser.add_argument("--tflite-cpus")
