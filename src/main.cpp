@@ -1,20 +1,104 @@
-// Dear ImGui: standalone example application for DirectX 11
-// If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
-// Read online: https://github.com/ocornut/imgui/tree/master/docs
-
-#include "imgui.h"
-#include "imgui_impl_win32.h"
-#include "imgui_impl_dx11.h"
-
 #include <stdio.h>
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <unordered_map>
 
+#include <argparse/argparse.hpp>
+#include <string>
 #include "App.h"
-#include "model.h"
 #include "gui.h"
+#include "IModel.h"
+#include "TensorflowLiteModel.h"
+#include "OnnxDirectMLModel.h"
 
+int run_app(std::unique_ptr<IModel>&& pModel);
+
+// Main code
+int main(int argc, char** argv) {
+    auto parser = argparse::ArgumentParser("run_soccerbot", "2.0.0");
+    parser.add_argument("--model")
+        .default_value(std::string("./models/cnn_113_80_quantized.tflite"))
+        .required()
+        .help("Path to model to load");
+    parser.add_argument("--runtime")
+        .default_value(std::string("onnx"))
+        .required()
+        .help("Type of runtime for model. Options: [onnx, tflite]");
+    parser.add_argument("--tflite-cpus")
+        .default_value(1)
+        .scan<'i', int>()
+        .required()
+        .help("Number of threads for tflite to use. If 0 is provided then number of logical processors is used.");
+    parser.add_argument("--onnx-device")
+        .default_value(std::string("directml"))
+        .required()
+        .help("Type of device for onnx runtime to use. Options: [directml, cpu]");
+    parser.add_argument("--onnx-directml-gpu-id")
+        .default_value(0)
+        .scan<'i', int>()
+        .required()
+        .help("GPU ID to use for onnx directml backend");
+
+    try {
+        parser.parse_args(argc, argv);
+    } catch (const std::runtime_error& ex) {
+        std::cerr << ex.what() <<std::endl;
+        std::cerr << parser;
+        return 1;
+    }
+    
+    auto model_path = parser.get<std::string>("--model");
+    printf("Loading model: %s\n", model_path.c_str());
+
+    auto runtime_type = parser.get<std::string>("--runtime");
+    bool is_onnx = true;
+    if (runtime_type.compare("onnx") == 0) {
+        is_onnx = true;
+    } else if (runtime_type.compare("tflite") == 0) {
+        is_onnx = false;
+    } else {
+        std::cerr << "Invalid runtime selected: " << runtime_type << std::endl;
+        std::cerr << parser;
+        return 1;
+    }
+    std::cout << "Selected backend: " << runtime_type << std::endl;
+
+    std::unique_ptr<IModel> pModel = nullptr;
+    if (is_onnx) {
+        auto onnx_device = parser.get<std::string>("--onnx-device");
+        int gpu_id = 0;
+        if (onnx_device.compare("cpu") == 0) {
+            std::cout << "Selected onnx CPU backend" << std::endl;
+            gpu_id = -1;
+        } else if (onnx_device.compare("directml") == 0) {
+            gpu_id = parser.get<int>("--onnx-directml-gpu-id");
+            std::cout << "Selected onnx DirectML backend GPU:" << gpu_id << std::endl;
+        } else {
+            std::cerr << "Invalid onnx device: " << onnx_device << std::endl;
+            return 1;
+        }
+        pModel = std::make_unique<OnnxDirectMLModel>(model_path.c_str(), gpu_id);
+    } else {
+        int total_threads = parser.get<int>("--tflite-cpus");
+        if (total_threads == 0) {
+            total_threads = std::thread::hardware_concurrency();
+        }
+        std::cout << "Select tflite backend with " << total_threads << " CPU threads" << std::endl;
+        pModel = std::make_unique<TensorflowLiteModel>(model_path.c_str(), total_threads);
+    }
+
+    pModel->PrintSummary();
+    return run_app(std::move(pModel));
+}
+
+// Dear ImGui: standalone example application for DirectX 11
+// If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
+// Read online: https://github.com/ocornut/imgui/tree/master/docs
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx11.h"
+// DX11 variables for imgui backend
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -26,7 +110,6 @@ static ID3D11Device*            g_pd3dDevice = NULL;
 static ID3D11DeviceContext*     g_pd3dDeviceContext = NULL;
 static IDXGISwapChain*          g_pSwapChain = NULL;
 static ID3D11RenderTargetView*  g_mainRenderTargetView = NULL;
-
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
@@ -34,44 +117,7 @@ void CreateRenderTarget();
 void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-int run_app(const char *filepath, const bool is_multithread);
-
-// Main code
-int main(int argc, char **argv)
-{
-    const char *model_path = 
-        (argc <= 1) ? 
-        "./models/cnn_113_80_quantized.tflite" : argv[1];
-
-    // load model
-    if (argc >= 2 && (strncmp(argv[1], "help", 4) == 0)) {
-        printf("Usage: %s <tflite_model>\n", argv[0]);
-        return 0;
-    }
-
-    // check argument for number of threads for model
-    bool is_multithread = false;
-    for (int i = 0; i < argc; i++) {
-        if (strncmp(argv[i], "--multithread", 13) == 0) {
-            is_multithread = true;
-            break;
-        }
-    }
-
-    try {
-        return run_app(model_path, is_multithread);
-    } catch (std::exception &ex) {
-        std::cerr << ex.what() << std::endl;
-    }
-
-    return 1;
-}
-
-int run_app(const char *filepath, const bool is_multithread) {
-    const uint32_t num_threads = is_multithread ? std::thread::hardware_concurrency() : 1;
-    printf("Starting model with %d threads\n", num_threads);
-    std::unique_ptr<Model> pModel = std::make_unique<Model>(filepath, num_threads);
-
+int run_app(std::unique_ptr<IModel>&& pModel) {
     // Create application window
     //ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("ImGui Example"), NULL };
@@ -142,7 +188,7 @@ int run_app(const char *filepath, const bool is_multithread) {
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // create app after setting up the dx11 context
-    auto main_app = App(pModel, g_pd3dDevice, g_pd3dDeviceContext);
+    auto main_app = App(std::move(pModel), g_pd3dDevice, g_pd3dDeviceContext);
 
     // Main loop
     bool done = false;
@@ -199,7 +245,6 @@ int run_app(const char *filepath, const bool is_multithread) {
 }
 
 // Helper functions
-
 bool CreateDeviceD3D(HWND hWnd)
 {
     // Setup swap chain

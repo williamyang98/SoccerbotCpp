@@ -7,18 +7,18 @@
 #include "util/AutoGui.h"
 
 SoccerPlayer::SoccerPlayer(
-    std::unique_ptr<Model> &model,
-    std::shared_ptr<util::MSS> &mss,
-    std::shared_ptr<SoccerParams> &params)
+    std::unique_ptr<IModel>&& model,
+    std::shared_ptr<util::MSS>& mss,
+    std::shared_ptr<SoccerParams>& params)
 {
     m_model = std::move(model);
     m_mss = mss;
     m_params = params;
     m_predictor = std::make_unique<Predictor>(params);
-
-    auto in_size = m_model->GetInputSize();
-    m_width = in_size.x;
-    m_height = in_size.y;
+    
+    auto in_buffer = m_model->GetInputBuffer();
+    m_width = in_buffer.width;
+    m_height = in_buffer.height;
     m_channels = 4;
     m_resize_buffer = new uint8_t[m_width*m_height*m_channels];
 
@@ -66,7 +66,7 @@ bool SoccerPlayer::Update(const int top, const int left) {
         m_channels);
 
     // flip and convert
-    RGB<float> *input_buffer = m_model->GetInputBuffer();
+    RGB<float> *input_buffer = m_model->GetInputBuffer().data;
     const RGBA<uint8_t> *rgba_data = reinterpret_cast<const RGBA<uint8_t>*>(m_resize_buffer);
     for (int y = 0; y < m_height; y++) {
         for (int x = 0; x < m_width; x++) {
@@ -90,7 +90,7 @@ bool SoccerPlayer::Update(const int top, const int left) {
     int64_t us_forward_time = us_end-us_grab;
 
     // pass image through network
-    Prediction raw_pred = m_model->GetResult();
+    Prediction raw_pred = m_model->GetPrediction();
 
     // play soccer
     float parse_time_secs = (float)(us_forward_time) / 1000000.0f;

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <memory>
 
-#include "model.h"
+#include "IModel.h"
 #include "SoccerPlayerController.h"
 #include "SoccerParams.h"
 #include "util/MSS.h"
@@ -16,7 +16,7 @@ void DrawRectInBuffer(
     RGBA<uint8_t> *buffer, int width, int height, int row_stride);
 
 App::App(
-    std::unique_ptr<Model> &model, 
+    std::unique_ptr<IModel>&& model, 
     ID3D11Device *dx11_device, ID3D11DeviceContext *dx11_context)
 {
     m_mss = std::make_shared<util::MSS>();
@@ -38,9 +38,9 @@ App::App(
     m_dx11_context = dx11_context;
 
     // setup model 
-    auto model_input_size = model->GetInputSize();
-    m_model_width = model_input_size.x;
-    m_model_height = model_input_size.y;
+    auto input_buffer = model->GetInputBuffer();
+    m_model_width = input_buffer.width;
+    m_model_height = input_buffer.height;
 
     // setup screen shotter
     SetScreenshotSize(320, 452);
@@ -53,7 +53,7 @@ App::App(
     }
 
     // create the player
-    auto player = std::make_shared<SoccerPlayer>(model, m_mss, m_params);
+    auto player = std::make_shared<SoccerPlayer>(std::move(model), m_mss, m_params);
     m_player = std::make_unique<SoccerPlayerController>(player);
 
     m_is_render_running = true;

@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "model.h"
+#include "IModel.h"
 #include "SoccerPlayerController.h"
 #include "SoccerParams.h"
 #include "util/MSS.h"
@@ -39,7 +39,7 @@ public:
     ID3D11Device *m_dx11_device; 
     ID3D11DeviceContext *m_dx11_context;
 public:
-    App(std::unique_ptr<Model> &model, 
+    App(std::unique_ptr<IModel>&& model, 
         ID3D11Device *dx11_device, ID3D11DeviceContext *dx11_context);
     void Update();
     void UpdateScreenshotTexture();

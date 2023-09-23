@@ -4,7 +4,7 @@
 #include <mutex>
 #include <atomic>
 
-#include "model.h"
+#include "IModel.h"
 #include "util/MSS.h"
 #include "Prediction.h"
 #include "Predictor.h"
@@ -18,7 +18,7 @@ public:
         float y;
     };
 private:
-    std::unique_ptr<Model> m_model; 
+    std::unique_ptr<IModel> m_model; 
     std::unique_ptr<Predictor> m_predictor;
     std::shared_ptr<util::MSS> m_mss;
     std::shared_ptr<SoccerParams> m_params;
@@ -50,9 +50,9 @@ private:
     Vec2D m_velocity;
 public:
     SoccerPlayer(
-        std::unique_ptr<Model> &model,
-        std::shared_ptr<util::MSS> &mss,
-        std::shared_ptr<SoccerParams> &params);
+        std::unique_ptr<IModel>&& model,
+        std::shared_ptr<util::MSS>& mss,
+        std::shared_ptr<SoccerParams>& params);
     ~SoccerPlayer();
     bool Update(const int top, const int left);
     uint8_t *GetResizeBuffer() { return m_resize_buffer; }

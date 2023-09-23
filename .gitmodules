@@ -13,3 +13,10 @@
 [submodule "fmt"]
     path = vendor/fmt
     url = https://github.com/fmtlib/fmt.git
+
+[submodule "argparse"]
+    path = vendor/argparse
+    url = https://github.com/p-ranav/argparse.git
+[submodule "vendor/argparse"]
+	path = vendor/argparse
+	url = https://github.com/p-ranav/argparse.git
