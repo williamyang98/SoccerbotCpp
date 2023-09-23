@@ -1,24 +1,31 @@
 if __name__ == "__main__":
     import argparse
-    DEFAULT_MODEL_PATH = "./models/model_train.h5f"
+    from models.select_model import get_model_types, select_model
+    MODEL_TYPES = get_model_types()
+    DEFAULT_MODEL_TYPE = MODEL_TYPES[0]
+    DEFAULT_MODEL_PATH = "./data/model-train-*.h5f"
 
     parser = argparse.ArgumentParser(description="Run model training", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--asset-path", type=str, default="../assets/", help="Path to game assets")
-    parser.add_argument("--model-in", type=str, default=DEFAULT_MODEL_PATH, help="Input path for pretrained model")
-    parser.add_argument("--model-out", type=str, default=DEFAULT_MODEL_PATH, help="Output path for trained model")
+    parser.add_argument("--model-type", type=str, default=DEFAULT_MODEL_TYPE, choices=MODEL_TYPES, help="Type of model")
+    parser.add_argument("--model-in", type=str, default=DEFAULT_MODEL_PATH, help="Input path for pretrained model. * is replaced with --model-type.")
+    parser.add_argument("--model-out", type=str, default=DEFAULT_MODEL_PATH, help="Output path for trained model. * is replaced with --model-type.")
     parser.add_argument("--epochs", type=int, default=100, help="Total epochs to train model")
     parser.add_argument("--steps-per-epoch", type=int, default=20, help="Total steps per epochs")
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
-    parser.add_argument("--total-parallel-load", type=int, default=4, help="Number of threads to spawn for generating data set")
+    parser.add_argument("--total-parallel-load", type=int, default=4, help="Number of threads to spawn for generating data set. If a value of 0 is provided then we use the number of logical processors.")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="ADAM learning rate")
-    parser.add_argument("--downscale", type=float, default=4, help="Amount to downscale the input by")
     parser.add_argument("--device", type=str, default="GPU:0", choices=["CPU", "GPU:0"], help="Device to use for training")
     parser.add_argument("--print-model-summary", action="store_true", help="Print model summary before training")
     parser.add_argument("--no-autosave", action="store_true", help="Disables saving model checkpoints automatically")
+    parser.add_argument("--restart-optimizer", action="store_true", help="Refreshes the optimizer from specified value")
     args = parser.parse_args()
 
     import os
     import pathlib
+
+    PATH_MODEL_IN = args.model_in.replace("*", args.model_type)
+    PATH_MODEL_OUT = args.model_out.replace("*", args.model_type)
 
     if not os.path.exists(args.asset_path):
         print(f"[error] invalid asset path: '{args.asset_path}'")
@@ -30,7 +37,7 @@ if __name__ == "__main__":
         TOTAL_DATA_THREADS = multiprocessing.cpu_count()
     print(f"Using {TOTAL_DATA_THREADS} threads for data loading")
 
-    pathlib.Path(os.path.dirname(args.model_out)).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.dirname(PATH_MODEL_OUT)).mkdir(parents=True, exist_ok=True)
 
     from generator import GeneratorConfig, BasicSampleGenerator
     import numpy as np
@@ -39,7 +46,7 @@ if __name__ == "__main__":
     # load 
     config = GeneratorConfig()
     config.set_background_image(os.path.join(args.asset_path, "icons/blank.png"))
-    config.set_ball_image(os.path.join(args.asset_path, "icons/ball_v2.png"))
+    config.set_ball_image(os.path.join(args.asset_path, "icons/ball.png"))
 
     emote_filepaths = []
     emote_filepaths.extend(glob.glob(os.path.join(args.asset_path, "icons/success*.png")))
@@ -49,9 +56,7 @@ if __name__ == "__main__":
     generator = BasicSampleGenerator(config)
 
     image, bounding_box, has_ball = generator.create_sample()
-    image = image.convert("RGB")
-    image = image.resize((int(x/args.downscale) for x in image.size))
-    im_width, im_height = image.size
+    im_original_width, im_original_height = image.size
     im_channels = 3
 
     import tensorflow as tf
@@ -62,7 +67,6 @@ if __name__ == "__main__":
 
                 image, bounding_box, has_ball = generator.create_sample()
                 image = image.convert("RGB")
-                image = image.resize((int(x/args.downscale) for x in image.size))
                 
                 x_in = np.asarray(image)
                 x_in = x_in.astype(np.float32) / 255.0
@@ -75,7 +79,7 @@ if __name__ == "__main__":
                 yield (x_in, y_out)
 
         def __new__(cls):
-            output_shape = (im_height,im_width,im_channels)
+            output_shape = (im_original_height,im_original_width,im_channels)
             return tf.data.Dataset.from_generator(
                 cls._generator,
                 output_signature=(
@@ -84,7 +88,34 @@ if __name__ == "__main__":
                 )
             )
     
+    SoccerBotModel = select_model(args.model_type)
+    DOWNSCALE_RATIO = SoccerBotModel.DOWNSCALE_RATIO
+    im_downscale_width, im_downscale_height = int(im_original_width/DOWNSCALE_RATIO), int(im_original_height/DOWNSCALE_RATIO)
+
+    x_in = tf.keras.layers.Input(shape=(im_downscale_height, im_downscale_width, im_channels))
+    y_out = SoccerBotModel()(x_in)
+    model = tf.keras.Model(inputs=x_in, outputs=y_out)
+    if args.print_model_summary:
+        model.summary()
+
+    # NOTE: We perform very aggressize data augmentation because the synthetic dataset doesn't represent every state in the game
+    #       Without this the model has many false detections after the game ramps up it's special effects
     def dataset_augment(image, label, training=True):
+        def resize_image(image, training=True): 
+            from tensorflow.image import ResizeMethod
+            import random
+            im_downscale_shape = (im_downscale_height, im_downscale_width)
+            # Make model resistant to different resizing algorithms
+            resize_methods = [ResizeMethod.MITCHELLCUBIC, ResizeMethod.BILINEAR, ResizeMethod.BICUBIC]
+            if not training:
+                # This is the resize method that stb uses in our C++ inference application
+                method = ResizeMethod.MITCHELLCUBIC
+            else:
+                method = random.choice(resize_methods)
+
+            image = tf.image.resize(image, im_downscale_shape, method=method)
+            return image
+
         def flip_vertical(image, label):
             image = tf.reverse(image, [0])
             confidence = label[2]
@@ -106,11 +137,15 @@ if __name__ == "__main__":
             return tf.math.less(uniform_random, threshold)
 
         assert image.get_shape().ndims == 3, "Image must be in format (W,H,C)"
-        from tensorflow.keras.layers import RandomContrast, RandomBrightness
+        from tensorflow.keras.layers import RandomContrast, RandomBrightness, GaussianNoise
         data_augmentation = tf.keras.Sequential([
             RandomContrast(0.3),
             RandomBrightness((-0.3,0.3), value_range=(0.0,1.0)),
+            GaussianNoise(0.2),
         ])
+
+        if DOWNSCALE_RATIO != 1:
+            image = resize_image(image, training=training)
         image = data_augmentation(image, training=training)
 
         if not training:
@@ -119,15 +154,6 @@ if __name__ == "__main__":
         image, label = tf.cond(get_random(), lambda: flip_vertical(image, label), lambda: (image, label))
         image, label = tf.cond(get_random(), lambda: flip_horizontal(image, label), lambda: (image, label))
         return image, label
-
-
-    def create_model():
-        from model import SoccerBotModel
-        module = SoccerBotModel()
-        x_in = tf.keras.layers.Input(shape=(im_height, im_width, im_channels))
-        y_out = module(x_in)
-        model = tf.keras.Model(inputs=x_in, outputs=y_out)
-        return model
    
     def detect_accuracy(y_true, y_pred, thresh=0.8):
         true_cls = y_true[:,2]
@@ -175,11 +201,6 @@ if __name__ == "__main__":
         net_err = cat_err + W0*pos_err
         return net_err
         
-    
-    model = create_model()
-    if args.print_model_summary:
-        model.summary()
-
     # training setup
     optimizer = tf.keras.optimizers.Adam(learning_rate=args.learning_rate)
 
@@ -196,7 +217,7 @@ if __name__ == "__main__":
     IS_AUTOSAVE = not args.no_autosave
     if IS_AUTOSAVE:
         checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=args.model_out,
+            filepath=PATH_MODEL_OUT,
             save_best_only=True,
             save_weights_only=True,
             monitor='loss',
@@ -204,13 +225,16 @@ if __name__ == "__main__":
             verbose=1
         )
         model_callbacks.append(checkpoint_callback)
-        print(f"Autosaving checkpoints to {args.model_out}")
+        print(f"Autosaving checkpoints to {PATH_MODEL_OUT}")
 
     try:
-        model.load_weights(args.model_in)
-        print(f"Loaded weights from '{args.model_in}'")
+        model.load_weights(PATH_MODEL_IN)
+        print(f"Loaded weights from '{PATH_MODEL_IN}'")
     except Exception as ex:
-        print(f"Failed to load in weights from '{args.model_in}': {ex}")
+        print(f"Failed to load in weights from '{PATH_MODEL_IN}': {ex}")
+
+    if args.restart_optimizer:
+        optimizer.lr.assign(args.learning_rate)
      
     dataset = tf.data.Dataset.range(TOTAL_DATA_THREADS)
     dataset = dataset.interleave(
@@ -237,7 +261,7 @@ if __name__ == "__main__":
             is_save_weights = False
 
     if is_save_weights: 
-        model.save_weights(args.model_out)
-        print(f"Saved weights to '{args.model_out}'")
+        model.save_weights(PATH_MODEL_OUT)
+        print(f"Saved weights to '{PATH_MODEL_OUT}'")
 
     

@@ -88,9 +88,15 @@ class BasicSampleGenerator:
         total_fireworks = random.randint(1, max_fireworks)
 
         for _ in range(total_fireworks):
-            explosion_size = random.randint(20, 40)
+            explosion_size = random.randint(10, 60)
+            # NOTE: Even though we have the main colours for the fireworks in the game they can vary between versions
+            #       Also the game may apply a tonemap which may alter the colour slightly, so we add in variation for robustness
             colour = random.choice(colours)
-            x, y = random.randint(explosion_size, width-explosion_size), random.randint(0, int(0.8*height))
+            colour = [c+random.randint(-30, 30) for c in colour]
+            colour = [np.clip(c, 0, 255) for c in colour]
+            colour = tuple([int(c) for c in colour])
+
+            x, y = random.randint(0, width), random.randint(0, height)
             create_firework(sample, (x, y), explosion_size, colour)
 
 
