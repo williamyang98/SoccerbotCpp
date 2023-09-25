@@ -29,9 +29,10 @@ App::App(
         p.confidence_threshold = 0.5f;
         p.max_lost_frames = 2;
 
-        p.height_trigger_soft = 0.7f;
-        p.fall_speed_trigger_soft = 0.0f;
-        p.fall_speed_trigger_hard = 0.2f;
+        p.height_trigger_soft = 0.60f;
+        p.height_trigger_hard = 0.35f;
+        p.fall_speed_trigger_soft = 0.01f;
+        p.fall_speed_trigger_hard = 0.10f;
     }
 
     m_dx11_device = dx11_device;
@@ -43,7 +44,7 @@ App::App(
     m_model_height = input_buffer.height;
 
     // setup screen shotter
-    SetScreenshotSize(320, 452);
+    SetScreenshotSize(320, 455);
 
     // create a texture for the model resize buffer
     {

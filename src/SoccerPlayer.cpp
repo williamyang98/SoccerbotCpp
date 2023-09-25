@@ -48,22 +48,34 @@ bool SoccerPlayer::Update(const int top, const int left) {
     m_mss->Grab(top, left);
 
     auto bitmap = m_mss->GetBitmap();
-    auto buffer_size = bitmap.GetSize();
-    auto buffer_max_size = m_mss->GetMaxSize();
-    int input_stride = sizeof(uint8_t)*4*buffer_max_size.x;
+    const auto buffer_size = bitmap.GetSize();
+    // NOTE: The screenshot buffer can be resized, so we might have to do some cropping
+    const auto buffer_max_size = m_mss->GetMaxSize();
+    const int input_stride = sizeof(uint8_t)*4*buffer_max_size.x;
+    const int output_stride = sizeof(uint8_t)*4*m_width;
+    const int rows_skip = buffer_max_size.y - buffer_size.y;
+    const int rows_offset = rows_skip*input_stride;
 
     auto &sec = bitmap.GetBitmap();
     BITMAP &bmp = sec.dsBm;
-    uint8_t *buffer = (uint8_t *)(bmp.bmBits);
-
-    int rows_skip = buffer_max_size.y - buffer_size.y;
-    int rows_offset = rows_skip*input_stride;
+    const uint8_t *buffer = (uint8_t *)(bmp.bmBits);
 
     // resize with quality
-    stbir_resize_uint8(
-        buffer+rows_offset, buffer_size.x, buffer_size.y, input_stride, 
-        m_resize_buffer, m_width, m_height, 0,
-        m_channels);
+    if ((m_width != buffer_size.x) || (m_height != buffer_size.y)) {
+        stbir_resize_uint8(
+            buffer+rows_offset, buffer_size.x, buffer_size.y, input_stride, 
+            m_resize_buffer, m_width, m_height, 0,
+            m_channels);
+    // copy without resizing
+    } else {
+        int i_src = rows_offset;
+        int i_dst = 0;
+        for (int y = 0; y < m_height; y++) {
+            std::memcpy(&m_resize_buffer[i_dst], &buffer[i_src], output_stride);
+            i_src += input_stride;
+            i_dst += output_stride;
+        }
+    }
 
     // flip and convert
     RGB<float> *input_buffer = m_model->GetInputBuffer().data;
@@ -164,11 +176,14 @@ bool SoccerPlayer::CheckIfClick(Prediction pred) {
         return true;
     }
 
-    if (dy <= -p.fall_speed_trigger_hard) {
+    if ((dy <= -p.fall_speed_trigger_hard) || (pred.y <= p.height_trigger_hard)) {
         m_is_soft_trigger = false;
         m_is_hard_trigger = true;
         return true;
     }
+
+    m_is_soft_trigger = false;
+    m_is_hard_trigger = false;
     return false;
 }
 

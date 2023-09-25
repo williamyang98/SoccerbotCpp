@@ -93,6 +93,7 @@ void RenderAIParameters(App &app) {
     ImGui::DragFloat("fall speed soft", &p.fall_speed_trigger_soft, 0.01f, 0.0f, 1.0f);
     ImGui::DragFloat("fall height soft", &p.height_trigger_soft, 0.01f, 0.0f, 1.0f);
     ImGui::DragFloat("fall speed hard", &p.fall_speed_trigger_hard, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("fall height hard", &p.height_trigger_hard, 0.01f, 0.0f, 1.0f);
     
     ImGui::Separator();
     ImGui::Text("AI state");

@@ -14,4 +14,5 @@ struct SoccerParams {
 
     // speed at which we trigger regardless of height
     float fall_speed_trigger_hard;
+    float height_trigger_hard;
 };

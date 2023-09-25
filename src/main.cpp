@@ -39,6 +39,15 @@ int main(int argc, char** argv) {
         .scan<'i', int>()
         .required()
         .help("GPU ID to use for onnx directml backend");
+    parser.add_argument("--onnx-cpu-threads")
+        .default_value(2)
+        .scan<'i', int>()
+        .required()
+        .help("Number of threads for use for CPU inference. If 0 is provided then onnx will optimise for best performance.");
+    parser.add_argument("--onnx-cpu-sequential")
+        .default_value(false)
+        .implicit_value(true)
+        .help("Sets onnx cpu backend to run the model sequentially");
 
     try {
         parser.parse_args(argc, argv);
@@ -67,18 +76,33 @@ int main(int argc, char** argv) {
     std::unique_ptr<IModel> pModel = nullptr;
     if (is_onnx) {
         auto onnx_device = parser.get<std::string>("--onnx-device");
-        int gpu_id = 0;
         if (onnx_device.compare("cpu") == 0) {
             std::cout << "Selected onnx CPU backend" << std::endl;
-            gpu_id = -1;
+            int total_threads = parser.get<int>("--onnx-cpu-threads");
+            if (total_threads != 0) {
+                std::cout << "Using " << total_threads << " threads for CPU inference" << std::endl;
+            } else {
+                std::cout << "Letting onnx optimise the number of CPU threads" << std::endl;
+            }
+
+            bool is_sequential = parser.get<bool>("--onnx-cpu-sequential");
+            std::cout << "CPU backend is running in parallel: " << !is_sequential << std::endl;
+
+            auto opts = OnnxDirectMLModel::CPU_Options{};
+            opts.total_threads = total_threads;
+            opts.is_sequential = is_sequential;
+            pModel = std::make_unique<OnnxDirectMLModel>(model_path.c_str(), opts);
         } else if (onnx_device.compare("directml") == 0) {
-            gpu_id = parser.get<int>("--onnx-directml-gpu-id");
+            const int gpu_id = parser.get<int>("--onnx-directml-gpu-id");
             std::cout << "Selected onnx DirectML backend GPU:" << gpu_id << std::endl;
+
+            auto opts = OnnxDirectMLModel::GPU_Options{};
+            opts.device_id = gpu_id;
+            pModel = std::make_unique<OnnxDirectMLModel>(model_path.c_str(), opts);
         } else {
             std::cerr << "Invalid onnx device: " << onnx_device << std::endl;
             return 1;
         }
-        pModel = std::make_unique<OnnxDirectMLModel>(model_path.c_str(), gpu_id);
     } else {
         int total_threads = parser.get<int>("--tflite-cpus");
         if (total_threads == 0) {

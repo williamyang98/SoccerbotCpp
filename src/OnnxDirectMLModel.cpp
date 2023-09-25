@@ -3,6 +3,7 @@
 #include <onnxruntime_c_api.h>
 #include <onnxruntime_cxx_api.h>
 #include <dml_provider_factory.h>
+#include <cpu_provider_factory.h>
 
 #include <cstdlib>
 #include <memory>
@@ -11,7 +12,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
-
 
 const char* onnx_data_type_to_str(ONNXTensorElementDataType type);
 
@@ -24,13 +24,34 @@ std::basic_string<wchar_t> create_wchar_string(const char* src) {
     return res;
 }
 
-OnnxDirectMLModel::OnnxDirectMLModel(const char* filepath, int gpu_id) {
+OnnxDirectMLModel::OnnxDirectMLModel(const char* filepath, OnnxDirectMLModel::GPU_Options opts) 
+: m_ort_api(Ort::GetApi())
+{
+    m_env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "onnx-directml-gpu");
+    ORT_ABORT_ON_ERROR(OrtSessionOptionsAppendExecutionProvider_DML(m_session_options, opts.device_id));
+    InitModel(filepath);
+}
+
+OnnxDirectMLModel::OnnxDirectMLModel(const char* filepath, OnnxDirectMLModel::CPU_Options opts)
+: m_ort_api(Ort::GetApi())
+{
+    m_env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "onnx-cpu");
+    if (opts.total_threads != 0) {
+        m_session_options.SetIntraOpNumThreads(opts.total_threads);
+    }
+    if (opts.is_sequential) {
+        m_session_options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+    } else {
+        m_session_options.SetExecutionMode(ExecutionMode::ORT_PARALLEL);
+    }
+    InitModel(filepath);
+}
+
+OnnxDirectMLModel::~OnnxDirectMLModel() {}
+
+void OnnxDirectMLModel::InitModel(const char* filepath) {
     auto w_filepath = create_wchar_string(filepath);
 
-    m_env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "onnx-model");
-    if (gpu_id >= 0) {
-        OrtSessionOptionsAppendExecutionProvider_DML(m_session_options, gpu_id);
-    }
     m_session = std::make_unique<Ort::Session>(*m_env.get(), w_filepath.c_str(), m_session_options);
 
     if (m_session->GetInputCount() != 1) {
@@ -105,11 +126,6 @@ OnnxDirectMLModel::OnnxDirectMLModel(const char* filepath, int gpu_id) {
     m_output_name = std::string(output_name.get()); 
 }
 
-
-OnnxDirectMLModel::~OnnxDirectMLModel() {
-    
-}
-
 void OnnxDirectMLModel::Parse() {
     const char* input_names[1] = { m_input_name.c_str() };
     const char* output_names[1] = { m_output_name.c_str() };
@@ -166,6 +182,16 @@ void OnnxDirectMLModel::PrintSummary() {
     }
 }
 
+void OnnxDirectMLModel::ORT_ABORT_ON_ERROR(OrtStatus* status) {
+    if (status == nullptr) {
+        return; 
+    }
+
+    const char* message = m_ort_api.GetErrorMessage(status);
+    fprintf(stderr, "ORT_ABORT_ON_ERROR: %s\n", message);
+    m_ort_api.ReleaseStatus(status);
+    exit(1);
+}
 
 const char* onnx_data_type_to_str(ONNXTensorElementDataType type) {
     switch (type) {

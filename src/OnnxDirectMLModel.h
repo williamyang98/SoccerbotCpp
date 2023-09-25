@@ -12,11 +12,20 @@
 
 class OnnxDirectMLModel: public IModel
 {
+public:
+    struct GPU_Options {
+        int device_id = 0;
+    };
+    struct CPU_Options {
+        int total_threads = 0; 
+        bool is_sequential = false;
+    };
 private:
     std::unique_ptr<Ort::Env> m_env;
     Ort::SessionOptions m_session_options;
     std::unique_ptr<Ort::Session> m_session;
     Ort::AllocatorWithDefaultOptions m_allocator;
+    const OrtApi& m_ort_api;
     
     std::vector<RGB<float>> m_input_buffer;
     size_t m_height;
@@ -32,7 +41,8 @@ private:
 
     Prediction m_prediction;
 public:
-    OnnxDirectMLModel(const char* filepath, int gpu_id);
+    OnnxDirectMLModel(const char* filepath, GPU_Options opts);
+    OnnxDirectMLModel(const char* filepath, CPU_Options opts);
     ~OnnxDirectMLModel() override;
     InputBuffer GetInputBuffer() override {
         return InputBuffer {
@@ -44,4 +54,7 @@ public:
     void Parse() override;
     Prediction GetPrediction() override { return m_prediction; }
     void PrintSummary() override;
+private:
+    void InitModel(const char* filepath);
+    void ORT_ABORT_ON_ERROR(OrtStatus* status);
 };
