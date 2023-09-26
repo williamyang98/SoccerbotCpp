@@ -1,3 +1,4 @@
+#include <exception>
 #include <stdio.h>
 #include <iostream>
 #include <memory>
@@ -15,7 +16,7 @@
 int run_app(std::unique_ptr<IModel>&& pModel);
 
 // Main code
-int main(int argc, char** argv) {
+int _main(int argc, char** argv) {
     auto parser = argparse::ArgumentParser("run_soccerbot", "2.0.0");
     parser.add_argument("--model")
         .default_value(std::string("./models/cnn_113_80_quantized.tflite"))
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
     try {
         parser.parse_args(argc, argv);
     } catch (const std::runtime_error& ex) {
-        std::cerr << ex.what() <<std::endl;
+        std::cerr << ex.what() << std::endl;
         std::cerr << parser;
         return 1;
     }
@@ -114,6 +115,16 @@ int main(int argc, char** argv) {
 
     pModel->PrintSummary();
     return run_app(std::move(pModel));
+}
+
+// Release mode builds don't have an exception output window
+int main(int argc, char** argv) {
+    try {
+        return _main(argc, argv);
+    } catch (std::exception& ex) {
+        std::cerr << "Exception: " << ex.what() << std::endl;
+        return 1;
+    }
 }
 
 // Dear ImGui: standalone example application for DirectX 11

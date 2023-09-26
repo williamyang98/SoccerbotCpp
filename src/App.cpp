@@ -29,9 +29,9 @@ App::App(
         p.confidence_threshold = 0.5f;
         p.max_lost_frames = 2;
 
-        p.height_trigger_soft = 0.60f;
-        p.height_trigger_hard = 0.35f;
-        p.fall_speed_trigger_soft = 0.01f;
+        p.height_trigger_soft = 0.70f;
+        p.height_trigger_hard = 0.45f;
+        p.fall_speed_trigger_soft = 0.00f;
         p.fall_speed_trigger_hard = 0.10f;
     }
 
