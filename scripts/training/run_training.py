@@ -19,6 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--print-model-summary", action="store_true", help="Print model summary before training")
     parser.add_argument("--no-autosave", action="store_true", help="Disables saving model checkpoints automatically")
     parser.add_argument("--restart-optimizer", action="store_true", help="Refreshes the optimizer from specified value")
+    parser.add_argument("--disable-lr-anneal", action="store_true", help="Disables learning rate reduction after training stalls")
     args = parser.parse_args()
 
     import os
@@ -137,11 +138,12 @@ if __name__ == "__main__":
             return tf.math.less(uniform_random, threshold)
 
         assert image.get_shape().ndims == 3, "Image must be in format (W,H,C)"
-        from tensorflow.keras.layers import RandomContrast, RandomBrightness, GaussianNoise
+        from tensorflow.keras.layers import RandomContrast, RandomBrightness, GaussianNoise, Lambda
         data_augmentation = tf.keras.Sequential([
-            RandomContrast(0.3),
-            RandomBrightness((-0.3,0.3), value_range=(0.0,1.0)),
-            GaussianNoise(0.2),
+            RandomContrast(0.1),
+            RandomBrightness((-0.1,0.1), value_range=(0.0,1.0)),
+            GaussianNoise(0.05),
+            Lambda(lambda image: tf.clip_by_value(image, 0.0, 1.0)),
         ])
 
         if DOWNSCALE_RATIO != 1:
@@ -205,14 +207,16 @@ if __name__ == "__main__":
     optimizer = tf.keras.optimizers.Adam(learning_rate=args.learning_rate)
 
     model.compile(
-        loss=custom_loss_fn, 
+        loss=custom_loss_fn,
         optimizer=optimizer,
         metrics=[detect_accuracy, position_accuracy]
     )
     
     model_callbacks = []
-    lr_callback = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2, patience=5)
-    model_callbacks.append(lr_callback)
+    if not args.disable_lr_anneal:
+        lr_callback = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2, patience=5)
+        model_callbacks.append(lr_callback)
+        print("Reducing learning rate on plateau")
     
     IS_AUTOSAVE = not args.no_autosave
     if IS_AUTOSAVE:

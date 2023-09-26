@@ -26,10 +26,10 @@ class BasicSampleGenerator:
         sample = self.create_background(size)
         score = random.randint(0, 60)
         
-        if score > 10:
+        if random.uniform(0, 1) > 0.5:
             self.create_light_beams(sample)
 
-        if score > 30:
+        if random.uniform(0, 1) > 0.5:
             self.create_fireworks(sample)
 
         create_ui(sample, self.config.background_image)

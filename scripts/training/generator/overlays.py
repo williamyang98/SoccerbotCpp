@@ -76,9 +76,9 @@ def create_ball(canvas, ball, rotation_range):
     background_width, background_height = canvas.size
     ball_width, ball_height = ball.size
     
-    # NOTE: Ball can exist outside the visible y-axis, but will always be within the x-axis
-    #       PIL pastes the image from the top-left corner
-    x = random.randint(0, background_width-ball_width)
+    # NOTE: We are more generous with the ball's x position compared to the actual game
+    #       This is for a more varied training data set
+    x = random.randint(int(-ball_width/2), int(background_width-ball_width/2))
     y = random.randint(int(-ball_height/2), int(background_height-ball_height/2))
     rotation = random.randint(rotation_range[0], rotation_range[1])
 
