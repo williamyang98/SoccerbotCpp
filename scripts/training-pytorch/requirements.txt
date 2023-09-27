@@ -1,0 +1,8 @@
+torch==2.0.0
+torch-directml==0.2.0.dev230426
+torchsummary
+torchvision==0.15.1
+onnx
+pillow
+numpy
+tqdm
