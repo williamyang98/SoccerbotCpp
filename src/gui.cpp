@@ -187,7 +187,7 @@ void RenderAIParameters(App &app) {
     ImGui::SliderFloat("acceleration", &p.acceleration, 0.0f, 10.0f);
     ImGui::SliderFloat("additional delay", &p.additional_model_delay, 0.0f, 0.5f);
     ImGui::SliderFloat("confidence threshold", &p.confidence_threshold, 0.0f, 1.0f);
-    ImGui::DragInt("max lost frames", &p.max_lost_frames, 1, 0, 5);
+    ImGui::SliderInt("max lost frames", &p.max_lost_frames, 0, 5);
 
     const float VMAX = 10.0f;
     ImGui::Separator();
@@ -214,10 +214,9 @@ void RenderAIParameters(App &app) {
     ImGui::SameLine();
     ImGui::Text("dy");
     ImGui::Separator();
+    ImGui::RadioButton("Tracking", player_controller->GetCanTrack());
     ImGui::RadioButton("Soft trigger", player_controller->GetIsSoftTrigger());
     ImGui::RadioButton("Hard trigger", player_controller->GetIsHardTrigger());
-    ImGui::RadioButton("Can track", player_controller->GetCanTrack());
-    ImGui::RadioButton("Can click", player_controller->GetCanClick());
 
     ImGui::End();
 }

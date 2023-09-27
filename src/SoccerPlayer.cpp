@@ -2,11 +2,15 @@
 #include "stb/stb_image_resize.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
-
 #include "SoccerPlayer.h"
 #include "util/AutoGui.h"
-
 #include <chrono>
+
+int clamp_value(int v, const int v_min, const int v_max) {
+    if (v < v_min) v = v_min;
+    if (v > v_max) v = v_max;
+    return v;
+}
 
 SoccerPlayer::SoccerPlayer(
     std::unique_ptr<IModel>&& model,
@@ -117,11 +121,16 @@ bool SoccerPlayer::Update(const int top, const int left) {
         const auto pred = m_is_using_predictor ? filtered_pred : raw_pred;
         const int screen_x = left +                 (int)(pred.x * (float)(buffer_size.x));
         const int screen_y = top  + buffer_size.y - (int)(pred.y * (float)(buffer_size.y));
-        util::SetCursorPosition(screen_x, screen_y);
+        
+        // NOTE: We do this to prevent unfocusing the window
+        const int click_padding = 5;
+        const int click_x = clamp_value(screen_x, left+click_padding, left+buffer_size.x-click_padding);
+        const int click_y = clamp_value(screen_y, top+click_padding, top+buffer_size.y-click_padding);
+        util::SetCursorPosition(click_x, click_y);
 
         const bool is_click = (m_is_clicking && m_can_click) || m_is_always_clicking;
         if (is_click) {
-            util::Click(screen_x, screen_y, util::MouseButton::LEFT);
+            util::Click(click_x, click_y, util::MouseButton::LEFT);
         }
     }
 
@@ -137,6 +146,9 @@ bool SoccerPlayer::Update(const int top, const int left) {
 bool SoccerPlayer::CheckIfClick(Prediction pred, const float vx, const float vy) {
     auto &p = *m_params;
     if (pred.confidence < m_params->confidence_threshold) {
+        m_is_soft_trigger = false;
+        m_is_hard_trigger = false;
+        m_velocity = {0.0f, 0.0f};
         return false;
     }
 
