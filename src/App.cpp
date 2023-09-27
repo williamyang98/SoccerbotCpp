@@ -31,8 +31,8 @@ App::App(
 
         p.height_trigger_soft = 0.70f;
         p.height_trigger_hard = 0.45f;
-        p.fall_speed_trigger_soft = 0.00f;
-        p.fall_speed_trigger_hard = 0.10f;
+        p.fall_speed_trigger_soft = 1.00f;
+        p.fall_speed_trigger_hard = 4.00f;
     }
 
     m_dx11_device = dx11_device;
@@ -86,8 +86,8 @@ App::App(
 
     util::AttachKeyboardListener(VK_F4, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool v = (*m_player)->GetIsClicking();
-            (*m_player)->SetIsClicking(!v);
+            bool v = (*m_player)->GetIsSmartClicking();
+            (*m_player)->SetIsSmartClicking(!v);
         }
     });
 
@@ -95,6 +95,13 @@ App::App(
         if (type == WM_KEYDOWN) {
             bool v = (*m_player)->GetIsUsingPredictor();
             (*m_player)->SetIsUsingPredictor(!v);
+        }
+    });
+
+    util::AttachKeyboardListener(VK_F6, [this](WPARAM type) {
+        if (type == WM_KEYDOWN) {
+            bool v = (*m_player)->GetIsAlwaysClicking();
+            (*m_player)->SetIsAlwaysClicking(!v);
         }
     });
 
@@ -177,33 +184,7 @@ void App::UpdateScreenshotTexture() {
         }
     }
 
-    // render the bounding box of ball prediction
-    auto raw_pred = m_player->GetRawPrediction();
-    auto filtered_pred = m_player->GetFilteredPrediction();
-
-    int wx = (int)(m_params->relative_ball_width * buffer_size.x * 0.5f);
-    int wy = wx;
-    const int pen_width = (int)std::max(1.0f, 0.01f*buffer_size.x);
-    const RGBA<uint8_t> raw_color = {255,0,0,255};
-    const RGBA<uint8_t> filtered_color = {0,0,255,255};
-
-    if (raw_pred.confidence > m_params->confidence_threshold) {
-        int cx = (int)((     raw_pred.x) * buffer_size.x);
-        int cy = (int)((1.0f-raw_pred.y) * buffer_size.y);
-        DrawRectInBuffer(
-            cx, cy, wx, wy, 
-            raw_color, pen_width,
-            dst_buffer, buffer_size.x, buffer_size.y, row_width);
-    }
-    if (filtered_pred.confidence > m_params->confidence_threshold) {
-        int cx = (int)((     filtered_pred.x) * buffer_size.x);
-        int cy = (int)((1.0f-filtered_pred.y) * buffer_size.y);
-        DrawRectInBuffer(
-            cx, cy, wx, wy, 
-            filtered_color, pen_width,
-            dst_buffer, buffer_size.x, buffer_size.y, row_width);
-    }
-
+    DrawPredictions(dst_buffer, buffer_size.x, buffer_size.y, row_width);
     m_dx11_context->Unmap(m_screenshot_texture, subresource);
 }
 
@@ -235,34 +216,62 @@ void App::UpdateModelTexture() {
         }
     }
 
+    DrawPredictions(dst_buffer, buffer_size.x, buffer_size.y, row_width);
+    m_dx11_context->Unmap(m_model_texture, subresource);
+}
+
+void App::DrawPredictions(RGBA<uint8_t>* buf, const int width, const int height, const int row_stride) {
     // render the bounding box of ball prediction
     auto raw_pred = m_player->GetRawPrediction();
     auto filtered_pred = m_player->GetFilteredPrediction();
 
-    int wx = (int)(m_params->relative_ball_width * buffer_size.x * 0.5f);
+    int wx = (int)(m_params->relative_ball_width * width * 0.5f);
     int wy = wx;
-    const int pen_width = (int)std::max(1.0f, 0.01f*buffer_size.x);
-    const RGBA<uint8_t> raw_color = {255,0,0,255};
-    const RGBA<uint8_t> filtered_color = {0,0,255,255};
+    const int pen_width = (int)std::max(1.0f, 0.01f*width);
+    
+    // This is in BGR format
+    const RGBA<uint8_t> raw_color = {255,0,0,255}; // blue
+    const RGBA<uint8_t> inactive_color = {240,220,5,120}; // light blue
+    const RGBA<uint8_t> track_color = {26,140,0,255}; // green
+    const RGBA<uint8_t> soft_trigger_color = {0,146,204,255}; // orange
+    const RGBA<uint8_t> hard_trigger_color = {0,0,255,255}; // red
 
-    if (raw_pred.confidence > m_params->confidence_threshold) {
-        int cx = (int)((     raw_pred.x) * buffer_size.x);
-        int cy = (int)((1.0f-raw_pred.y) * buffer_size.y);
+    auto& player_controller = *(m_player.get());
+    RGBA<uint8_t> pred_color = inactive_color;
+    // if we aren't showing the filtered position, use the darker colour for the raw prediction by default
+    if (!m_render_overlay_flags.filtered_pred) {
+        pred_color = raw_color;
+    }
+    if (player_controller->GetIsTracking()) {
+        pred_color = track_color;
+    } 
+    if (player_controller->GetIsSoftTrigger()) {
+        pred_color = soft_trigger_color;
+    }
+    if (player_controller->GetIsHardTrigger()) {
+        pred_color = hard_trigger_color;
+    }
+
+    if (m_render_overlay_flags.raw_pred && (raw_pred.confidence > m_params->confidence_threshold)) {
+        int cx = (int)((     raw_pred.x) * width);
+        int cy = (int)((1.0f-raw_pred.y) * height);
+        
+        // show the trigger status colours even if we are only showing the raw prediction
+        const RGBA<uint8_t> color = m_render_overlay_flags.filtered_pred ? raw_color : pred_color;
+        if (!m_render_overlay_flags.filtered_pred)
         DrawRectInBuffer(
             cx, cy, wx, wy, 
-            raw_color, pen_width,
-            dst_buffer, buffer_size.x, buffer_size.y, row_width);
+            color, pen_width,
+            buf, width, height, row_stride);
     }
-    if (filtered_pred.confidence > m_params->confidence_threshold) {
-        int cx = (int)((     filtered_pred.x) * buffer_size.x);
-        int cy = (int)((1.0f-filtered_pred.y) * buffer_size.y);
+    if (m_render_overlay_flags.filtered_pred && (filtered_pred.confidence > m_params->confidence_threshold)) {
+        int cx = (int)((     filtered_pred.x) * width);
+        int cy = (int)((1.0f-filtered_pred.y) * height);
         DrawRectInBuffer(
             cx, cy, wx, wy, 
-            filtered_color, pen_width,
-            dst_buffer, buffer_size.x, buffer_size.y, row_width);
+            pred_color, pen_width,
+            buf, width, height, row_stride);
     }
-
-    m_dx11_context->Unmap(m_model_texture, subresource);
 }
 
 void DrawRectInBuffer(

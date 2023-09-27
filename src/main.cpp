@@ -17,7 +17,7 @@ int run_app(std::unique_ptr<IModel>&& pModel);
 
 // Main code
 int _main(int argc, char** argv) {
-    auto parser = argparse::ArgumentParser("run_soccerbot", "2.0.0");
+    auto parser = argparse::ArgumentParser("SoccerBot Inference Application", "2.0.0");
     parser.add_argument("--model")
         .default_value(std::string("./models/cnn_113_80_quantized.tflite"))
         .required()
@@ -155,9 +155,9 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 int run_app(std::unique_ptr<IModel>&& pModel) {
     // Create application window
     //ImGui_ImplWin32_EnableDpiAwareness();
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("ImGui Example"), NULL };
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("SoccerBot"), NULL };
     ::RegisterClassEx(&wc);
-    HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("Dear ImGui DirectX11 Example"), WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("SoccerBot"), WS_OVERLAPPEDWINDOW, 100, 100, 800, 650, NULL, NULL, wc.hInstance, NULL);
 
     // Initialize Direct3D
     if (!CreateDeviceD3D(hwnd))

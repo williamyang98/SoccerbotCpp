@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <d3d11.h>
 
+#include <stdint.h>
 #include <memory>
 
 #include "IModel.h"
@@ -25,6 +26,10 @@ public:
     std::shared_ptr<SoccerParams> m_params;
     
     bool m_is_render_running;
+    struct OverlayRender {
+        bool raw_pred = true;
+        bool filtered_pred = false;
+    } m_render_overlay_flags;
     
     int m_texture_width, m_texture_height;
     int m_screen_width, m_screen_height;
@@ -47,5 +52,6 @@ public:
     void SetScreenshotSize(const int width, const int height);
 private:
     TextureWrapper CreateTexture(const int width, const int height);
+    void DrawPredictions(RGBA<uint8_t>* buf, const int width, const int height, const int row_stride);
 };
 

@@ -1,4 +1,5 @@
 #include "Predictor.h"
+#include <stdint.h>
 #include <chrono>
 
 Predictor::Predictor(std::shared_ptr<SoccerParams> &params) {
@@ -8,14 +9,14 @@ Predictor::Predictor(std::shared_ptr<SoccerParams> &params) {
     m_has_last_prediction = false;
 }
 
-Prediction Predictor::Filter(Prediction pred, float pred_delay_secs) {
+Predictor::FilteredOutput Predictor::Filter(Prediction pred, float pred_delay_secs) {
     const auto get_us = []() {
         auto clock = std::chrono::high_resolution_clock::now(); 
         return std::chrono::time_point_cast<std::chrono::microseconds>(clock).time_since_epoch().count();
     };
 
-    long long us_now = get_us();
-    long long us_frame = us_now - m_last_time_us;
+    int64_t us_now = get_us();
+    int64_t us_frame = us_now - m_last_time_us;
     m_last_time_us = us_now;
 
     // dt = seconds
@@ -28,7 +29,10 @@ Prediction Predictor::Filter(Prediction pred, float pred_delay_secs) {
         if (m_total_lost_frames >= p.max_lost_frames) {
             m_has_last_prediction = false;
         }
-        return {0.0f, 0.0f, 0.0f};
+        return FilteredOutput { 
+            Prediction { 0.0f, 0.0f, 0.0f },
+            FilteredOutput::Velocity { 0.0f, 0.0f }
+        };
     }
 
     // seed prediction if its missing (we track motion)
@@ -68,5 +72,8 @@ Prediction Predictor::Filter(Prediction pred, float pred_delay_secs) {
     }
 
     m_last_prediction = pred;
-    return {real_x, real_y, pred.confidence};
+    return FilteredOutput { 
+        Prediction { real_x, real_y, pred.confidence },
+        FilteredOutput::Velocity { vx, vy }
+    };
 }

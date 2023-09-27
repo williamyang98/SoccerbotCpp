@@ -6,6 +6,8 @@
 #include "SoccerPlayer.h"
 #include "util/AutoGui.h"
 
+#include <chrono>
+
 SoccerPlayer::SoccerPlayer(
     std::unique_ptr<IModel>&& model,
     std::shared_ptr<util::MSS>& mss,
@@ -106,43 +108,33 @@ bool SoccerPlayer::Update(const int top, const int left) {
 
     // play soccer
     float parse_time_secs = (float)(us_forward_time) / 1000000.0f;
-    Prediction filtered_pred = m_predictor->Filter(raw_pred, parse_time_secs);
+    const auto filtered_output = m_predictor->Filter(raw_pred, parse_time_secs);
+    const Prediction filtered_pred = filtered_output.prediction;
     m_can_track = filtered_pred.confidence > m_params->confidence_threshold;
-    m_can_click = CheckIfClick(filtered_pred);
+    m_can_click = CheckIfClick(filtered_pred, filtered_output.velocity.x, filtered_output.velocity.y);
 
-    // click on the ball
-    if (m_is_using_predictor) {
-        if (m_is_tracking && m_can_track) {
-            int x = left +                 (int)(filtered_pred.x * (float)(buffer_size.x));
-            int y = top  + buffer_size.y - (int)(filtered_pred.y * (float)(buffer_size.y));
-            util::SetCursorPosition(x, y);
-            if (m_is_clicking && m_can_click) {
-                util::Click(x, y, util::MouseButton::LEFT);
-            }
-        }
-    // using raw model predictions
-    } else {
-        if (m_is_tracking && m_can_track) {
-            int x = left +                 (int)(raw_pred.x * (float)(buffer_size.x));
-            int y = top  + buffer_size.y - (int)(raw_pred.y * (float)(buffer_size.y));
-            util::SetCursorPosition(x, y);
-            //  raw model predictions dont use velocity information
-            if (m_is_clicking) {
-                util::Click(x, y, util::MouseButton::LEFT);
-            }
+    if (m_is_tracking && m_can_track) {
+        const auto pred = m_is_using_predictor ? filtered_pred : raw_pred;
+        const int screen_x = left +                 (int)(pred.x * (float)(buffer_size.x));
+        const int screen_y = top  + buffer_size.y - (int)(pred.y * (float)(buffer_size.y));
+        util::SetCursorPosition(screen_x, screen_y);
+
+        const bool is_click = (m_is_clicking && m_can_click) || m_is_always_clicking;
+        if (is_click) {
+            util::Click(screen_x, screen_y, util::MouseButton::LEFT);
         }
     }
 
     // update predictions
     {
         m_raw_pred = raw_pred;
-        m_filtered_pred = filtered_pred;
+        m_filtered_pred = Prediction { filtered_pred.x, filtered_pred.y, filtered_pred.confidence };
     }
 
     return true;
 }
 
-bool SoccerPlayer::CheckIfClick(Prediction pred) {
+bool SoccerPlayer::CheckIfClick(Prediction pred, const float vx, const float vy) {
     auto &p = *m_params;
     if (pred.confidence < m_params->confidence_threshold) {
         return false;
@@ -153,9 +145,9 @@ bool SoccerPlayer::CheckIfClick(Prediction pred) {
         m_prev_filtered_pred = pred;
     }
 
-    auto &last_pred = m_prev_filtered_pred;
-    float dx = pred.x - last_pred.x;
-    float dy = pred.y - last_pred.y;
+    const auto last_pred = m_prev_filtered_pred;
+    m_prev_filtered_pred = pred;
+    m_velocity = {vx, vy};
 
     // ignore if outside of screen
     if ((pred.x >= 1.0f) || (pred.x <= 0.0f) || 
@@ -167,16 +159,15 @@ bool SoccerPlayer::CheckIfClick(Prediction pred) {
         return false;
     }
 
-    m_velocity = {dx, dy};
     // falling down and near bottom of screen
     // or falling down really fast regardless of position
-    if ((dy <= -p.fall_speed_trigger_soft) && (pred.y <= p.height_trigger_soft)) {
+    if ((vy <= -p.fall_speed_trigger_soft) && (pred.y <= p.height_trigger_soft)) {
         m_is_soft_trigger = true;
         m_is_hard_trigger = false;
         return true;
     }
 
-    if ((dy <= -p.fall_speed_trigger_hard) || (pred.y <= p.height_trigger_hard)) {
+    if ((vy <= -p.fall_speed_trigger_hard) || (pred.y <= p.height_trigger_hard)) {
         m_is_soft_trigger = false;
         m_is_hard_trigger = true;
         return true;

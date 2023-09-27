@@ -42,11 +42,11 @@ private:
     std::atomic<bool> m_is_clicking;
 
     bool m_is_using_predictor;
-
     bool m_is_soft_trigger;
     bool m_is_hard_trigger;
     bool m_can_track;
     bool m_can_click;
+    bool m_is_always_clicking;
     Vec2D m_velocity;
 public:
     SoccerPlayer(
@@ -63,8 +63,10 @@ public:
 
     inline bool GetIsTracking() const { return m_is_tracking; }
     inline void SetIsTracking(bool v) { m_is_tracking = v; }
-    inline bool GetIsClicking() const { return m_is_clicking; }
-    inline void SetIsClicking(bool v) { m_is_clicking = v; }
+    inline bool GetIsSmartClicking() const { return m_is_clicking; }
+    inline void SetIsSmartClicking(bool v) { m_is_clicking = v; }
+    inline bool GetIsAlwaysClicking() const { return m_is_always_clicking; }
+    inline void SetIsAlwaysClicking(bool v) { m_is_always_clicking = v; }
     inline bool GetIsUsingPredictor() const { return m_is_using_predictor; }
     inline void SetIsUsingPredictor(bool v) { m_is_using_predictor = v; }
     inline bool GetIsSoftTrigger() const { return m_is_soft_trigger; }
@@ -74,5 +76,5 @@ public:
 
     inline Vec2D GetVelocity() const { return m_velocity; }
 private:
-    bool CheckIfClick(Prediction pred);
+    bool CheckIfClick(Prediction pred, const float vx, const float vy);
 };
