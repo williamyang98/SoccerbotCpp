@@ -1,3 +1,5 @@
+[![x86-windows](https://github.com/FiendChain/SoccerbotCpp/actions/workflows/x86-windows.yml/badge.svg)](https://github.com/FiendChain/SoccerbotCpp/actions/workflows/x86-windows.yml)
+
 # Introduction
 A bot for playing facebook soccer 
 - Uses windows api for mouse movement and screen grabbing
