@@ -19,11 +19,11 @@ int run_app(std::unique_ptr<IModel>&& pModel);
 int _main(int argc, char** argv) {
     auto parser = argparse::ArgumentParser("SoccerBot Inference Application", "2.0.0");
     parser.add_argument("--model")
-        .default_value(std::string("./models/cnn_113_80_quantized.tflite"))
+        .default_value(std::string("./models/onnx-basic-small.onnx"))
         .required()
         .help("Path to model to load");
     parser.add_argument("--runtime")
-        .default_value(std::string("tflite"))
+        .default_value(std::string("onnx"))
         .required()
         .help("Type of runtime for model. Options: [onnx, tflite]");
     parser.add_argument("--tflite-cpus")
@@ -32,7 +32,7 @@ int _main(int argc, char** argv) {
         .required()
         .help("Number of threads for tflite to use. If 0 is provided then number of logical processors is used.");
     parser.add_argument("--onnx-device")
-        .default_value(std::string("directml"))
+        .default_value(std::string("cpu"))
         .required()
         .help("Type of device for onnx runtime to use. Options: [directml, cpu]");
     parser.add_argument("--onnx-directml-gpu-id")

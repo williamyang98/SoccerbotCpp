@@ -17,10 +17,10 @@ https://github.com/FiendChain/SoccerbotCpp/assets/21079869/9c4b8c97-8eb6-4dfd-8b
 # Run instructions
 | Command | Description |
 | --- | --- |
-| ```./main``` | Run with default settings |
-| ```./main --model ./models/*.tflite --runtime tflite``` | Run tflite mode on CPU |
-| ```./main --model ./models/*.onnx --runtime onnx --onnx-device cpu``` | Run onnx model on CPU |
-| ```./main --model ./models/*.onnx --runtime onnx --onnx-device directml``` | Run onnx model on GPU using DirectML |
+| ```./soccerbot``` | Run with default settings |
+| ```./soccerbot --model ./models/*.tflite --runtime tflite``` | Run tflite mode on CPU |
+| ```./soccerbot --model ./models/*.onnx --runtime onnx --onnx-device cpu``` | Run onnx model on CPU |
+| ```./soccerbot --model ./models/*.onnx --runtime onnx --onnx-device directml``` | Run onnx model on GPU using DirectML |
 
 # Training and emulator
 Refer to ```scripts/README.md``` for instructions to train models and run emulator.

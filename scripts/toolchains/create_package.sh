@@ -7,5 +7,7 @@ mkdir -p ${output_dir}
 
 cp ${build_dir}/*.exe ${output_dir}/
 cp ${build_dir}/*.dll ${output_dir}/
+cp *.ini ${output_dir}/
+
 cp -rf models/ ${output_dir}/
 cp README.md ${output_dir}/
