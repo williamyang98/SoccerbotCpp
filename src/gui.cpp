@@ -261,9 +261,15 @@ void RenderScreenImage(App &app) {
     auto screen_pos = player_controller->GetPosition();
     ImGui::SliderFloat("Scale", &zoom_scale, 0.1f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
     if (app.m_is_render_running) app.UpdateScreenshotTexture();
+
+    ImVec4 border_col = ImGui::GetStyleColorVec4(ImGuiCol_Border);
     ImGui::Image(
         (void*)app.m_screenshot_texture_view, 
-        ImVec2(app.m_texture_width*zoom_scale, app.m_texture_height*zoom_scale));
+        ImVec2(app.m_texture_width*zoom_scale, app.m_texture_height*zoom_scale),
+        ImVec2(0,0), ImVec2(1,1),
+        ImVec4(1,1,1,1),
+        ImGui::GetStyleColorVec4(ImGuiCol_Border)
+    );
     ImGui::EndTabItem();
 
     // create dragging controls for the image
@@ -302,7 +308,11 @@ void RenderModelImage(App &app) {
     if (app.m_is_render_running) app.UpdateModelTexture();
     ImGui::Image(
         (void*)app.m_model_texture_view, 
-        ImVec2(app.m_model_width*zoom_scale, app.m_model_height*zoom_scale));
+        ImVec2(app.m_model_width*zoom_scale, app.m_model_height*zoom_scale),
+        ImVec2(0,0), ImVec2(1,1),
+        ImVec4(1,1,1,1),
+        ImGui::GetStyleColorVec4(ImGuiCol_Border)
+    );
     ImGui::EndTabItem();
 
     // create dragging controls for the image
