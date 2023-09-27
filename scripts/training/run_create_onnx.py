@@ -3,8 +3,8 @@ if __name__ == '__main__':
     from models.select_model import get_model_types, select_model
     MODEL_TYPES = get_model_types()
     DEFAULT_MODEL_TYPE = MODEL_TYPES[0]
-    DEFAULT_MODEL_PATH = "./data/model-train-*.h5f"
-    DEFAULT_ONNX_PATH = "./data/onnx-out-*.onnx"
+    DEFAULT_MODEL_PATH = "./data/checkpoint-*.h5f"
+    DEFAULT_ONNX_PATH = "./data/onnx-*.onnx"
 
     parser = argparse.ArgumentParser(description="Quantize tensorflow model to onnx", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--model-type", type=str, default=DEFAULT_MODEL_TYPE, choices=MODEL_TYPES, help="Type of model")
@@ -14,6 +14,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # get the generator config
+    import sys
+    sys.path.append("../")
     from generator import GeneratorConfig, BasicSampleGenerator
     import numpy as np
     import os

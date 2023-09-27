@@ -3,7 +3,7 @@ if __name__ == "__main__":
     from models.select_model import get_model_types, select_model
     MODEL_TYPES = get_model_types()
     DEFAULT_MODEL_TYPE = MODEL_TYPES[0]
-    DEFAULT_MODEL_PATH = "./data/model-train-*.h5f"
+    DEFAULT_MODEL_PATH = "./data/checkpoint-*.h5f"
 
     parser = argparse.ArgumentParser(description="Run model training", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--asset-path", type=str, default="../assets/", help="Path to game assets")
@@ -23,6 +23,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     import os
+    import sys
     import pathlib
 
     PATH_MODEL_IN = args.model_in.replace("*", args.model_type)
@@ -39,7 +40,8 @@ if __name__ == "__main__":
     print(f"Using {TOTAL_DATA_THREADS} threads for data loading")
 
     pathlib.Path(os.path.dirname(PATH_MODEL_OUT)).mkdir(parents=True, exist_ok=True)
-
+        
+    sys.path.append("../")
     from generator import GeneratorConfig, BasicSampleGenerator
     import numpy as np
     import glob
