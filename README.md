@@ -7,7 +7,7 @@ A bot for playing facebook soccer
 - Refer to https://github.com/FiendChain/SoccerBot for original python implementation
 
 # Preview
-![Main window](docs/screenshot_v1.png)
+https://github.com/FiendChain/SoccerbotCpp/assets/21079869/9c4b8c97-8eb6-4dfd-8b0c-ecee0e84505d
 
 # Build instructions
 1. ```Setup MSVC C++ developer environment with clang, Ninja, and vcpkg```
