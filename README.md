@@ -9,7 +9,7 @@ A bot for playing facebook soccer
 
 # Build instructions
 1. ```Setup MSVC C++ developer environment with clang, Ninja, and vcpkg```
-2. ```CC=clang CXX=clang++ ./cmake_configure.sh```
+2. ```CC=clang CXX=clang++ ./scripts/toolchains/cmake_configure.sh```
 3. ```ninja -C build```
 4. ```./build/main.exe```
 
