@@ -1,4 +1,6 @@
 build/
+build-*/
+build_*/
 .cache/
 .vscode/
 imgui.ini

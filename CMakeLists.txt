@@ -28,7 +28,6 @@ add_executable(soccerbot
     # soccer logic
     ${CMAKE_SOURCE_DIR}/src/App.cpp 
     ${CMAKE_SOURCE_DIR}/src/SoccerPlayer.cpp 
-    ${CMAKE_SOURCE_DIR}/src/SoccerPlayerController.cpp 
     ${CMAKE_SOURCE_DIR}/src/Predictor.cpp
     # utility
     ${VENDOR_DIR}/util/MSS.cpp    
@@ -42,6 +41,23 @@ target_link_libraries(soccerbot PRIVATE
     argparse::argparse fmt::fmt
     imgui_docking 
     "d3d11.lib" "dxgi.lib" "d3dcompiler.lib") 
+
+# simd compile options
+if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+    if(MSVC)
+        add_compile_definitions(_SILENCE_NONFLOATING_COMPLEX_DEPRECATION_WARNING)
+        add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+        # for MSVC multi processor compilation
+        add_compile_options(/MP)
+        add_compile_options(/fp:fast /arch:AVX2)
+        # add_compile_options(/fp:fast /arch:AVX)
+        # add_compile_options(/fp:fast)
+    else()
+        add_compile_options(-march=native -ffast-math)
+    endif()
+else()
+    add_compile_options(-ffast-math)
+endif()
 
 # install dlls for tensorflow-lite and onnxruntime-directml
 add_custom_command(

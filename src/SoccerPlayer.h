@@ -1,8 +1,8 @@
 #pragma once
 
+#include <stdint.h>
 #include <memory>
-#include <mutex>
-#include <atomic>
+#include <vector>
 
 #include "IModel.h"
 #include "util/MSS.h"
@@ -13,68 +13,65 @@
 class SoccerPlayer 
 {
 public: 
+    template <typename T>
     struct Vec2D {
-        float x; 
-        float y;
+        T x = T(0); 
+        T y = T(0);
+    };
+    struct Timings {
+        int64_t us_image_grab = 0;
+        int64_t us_image_resize = 0;
+        int64_t us_image_convert = 0;
+        int64_t us_model_inference = 0;
+    };
+    struct Controls {
+        bool can_track = false;
+        bool can_smart_click = false;
+        bool can_always_click = false;
+        bool can_use_predictor = true;
+        int click_padding = 5;
+    };
+    struct Status {
+        bool is_tracking = false;
+        bool is_clicking = false;
+        bool is_soft_trigger = false;
+        bool is_hard_trigger = false;
     };
 private:
     std::unique_ptr<IModel> m_model; 
     std::unique_ptr<Predictor> m_predictor;
     std::shared_ptr<util::MSS> m_mss;
     std::shared_ptr<SoccerParams> m_params;
-
-    uint8_t *m_resize_buffer;
-    int m_width;
-    int m_height;
-    int m_channels;
+    
+    std::vector<RGBA<uint8_t>> m_resize_buffer;
+    Vec2D<int> m_resize_buffer_size;
+    Vec2D<int> m_capture_buffer_size;
 
     Prediction m_raw_pred;
     Prediction m_filtered_pred;
-    std::mutex m_raw_pred_mutex;
-    std::mutex m_filtered_pred_mutex;
-
     Prediction m_prev_filtered_pred;
     bool m_has_prev_filtered_pred;
+    Vec2D<float> m_velocity;
 
-    int64_t m_us_parse_time;
-
-    std::atomic<bool> m_is_tracking;
-    std::atomic<bool> m_is_clicking;
-
-    bool m_is_using_predictor;
-    bool m_is_soft_trigger;
-    bool m_is_hard_trigger;
-    bool m_can_track;
-    bool m_can_click;
-    bool m_is_always_clicking;
-    Vec2D m_velocity;
+    Timings m_timings;
+    Controls m_controls;
+    Status m_status;
 public:
     SoccerPlayer(
         std::unique_ptr<IModel>&& model,
         std::shared_ptr<util::MSS>& mss,
         std::shared_ptr<SoccerParams>& params);
-    ~SoccerPlayer();
     bool Update(const int top, const int left);
-    uint8_t *GetResizeBuffer() { return m_resize_buffer; }
-    inline int64_t GetParseTimeMicroseconds() const { return m_us_parse_time; }
+    const auto& GetResizeBuffer() const { return m_resize_buffer; }
+    const auto& GetTimings() const { return m_timings; }
+    const auto& GetStatus() const { return m_status; }
+    auto& GetControls() { return m_controls; }
 
-    Prediction GetRawPrediction();
-    Prediction GetFilteredPrediction();
-
-    inline bool GetIsTracking() const { return m_is_tracking; }
-    inline void SetIsTracking(bool v) { m_is_tracking = v; }
-    inline bool GetIsSmartClicking() const { return m_is_clicking; }
-    inline void SetIsSmartClicking(bool v) { m_is_clicking = v; }
-    inline bool GetIsAlwaysClicking() const { return m_is_always_clicking; }
-    inline void SetIsAlwaysClicking(bool v) { m_is_always_clicking = v; }
-    inline bool GetIsUsingPredictor() const { return m_is_using_predictor; }
-    inline void SetIsUsingPredictor(bool v) { m_is_using_predictor = v; }
-    inline bool GetIsSoftTrigger() const { return m_is_soft_trigger; }
-    inline bool GetIsHardTrigger() const { return m_is_hard_trigger; }
-    inline bool GetCanTrack() const { return m_can_track; }
-    inline bool GetCanClick() const { return m_can_click; }
-
-    inline Vec2D GetVelocity() const { return m_velocity; }
+    Prediction GetRawPrediction() const { return m_raw_pred; }
+    Prediction GetFilteredPrediction() const { return m_filtered_pred; }
+    auto GetVelocity() const { return m_velocity; }
 private:
-    bool CheckIfClick(Prediction pred, const float vx, const float vy);
+    void ResizeImage();
+    void ConvertImage();
+    void UpdateTriggers(Prediction pred, const float vx, const float vy);
 };

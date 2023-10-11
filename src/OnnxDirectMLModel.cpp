@@ -28,6 +28,7 @@ OnnxDirectMLModel::OnnxDirectMLModel(const char* filepath, OnnxDirectMLModel::GP
 : m_ort_api(Ort::GetApi())
 {
     m_env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "onnx-directml-gpu");
+    m_session_options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
     ORT_ABORT_ON_ERROR(OrtSessionOptionsAppendExecutionProvider_DML(m_session_options, opts.device_id));
     InitModel(filepath);
 }

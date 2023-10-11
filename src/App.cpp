@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "IModel.h"
-#include "SoccerPlayerController.h"
+#include "SoccerPlayer.h"
 #include "SoccerParams.h"
 #include "util/MSS.h"
 #include "util/AutoGui.h"
@@ -54,20 +54,16 @@ App::App(
     }
 
     // create the player
-    auto player = std::make_shared<SoccerPlayer>(std::move(model), m_mss, m_params);
-    m_player = std::make_unique<SoccerPlayerController>(player);
-
+    m_player = std::make_unique<SoccerPlayer>(std::move(model), m_mss, m_params);
+    m_is_model_running = true;
     m_is_render_running = true;
-    m_player->SetIsRunning(true);
-
 
     // create application bindings
     util::InitGlobalListener();
 
     util::AttachKeyboardListener(VK_F1, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool v = m_player->GetIsRunning();
-            m_player->SetIsRunning(!v);
+            m_is_model_running = !m_is_model_running;
         }
     });
 
@@ -79,33 +75,45 @@ App::App(
 
     util::AttachKeyboardListener(VK_F3, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool v = (*m_player)->GetIsTracking();
-            (*m_player)->SetIsTracking(!v);
+            auto& controls = m_player->GetControls();
+            controls.can_track = !controls.can_track;
         }
     });
 
     util::AttachKeyboardListener(VK_F4, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool v = (*m_player)->GetIsSmartClicking();
-            (*m_player)->SetIsSmartClicking(!v);
+            auto& controls = m_player->GetControls();
+            controls.can_smart_click = !controls.can_smart_click;
         }
     });
 
     util::AttachKeyboardListener(VK_F5, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool v = (*m_player)->GetIsUsingPredictor();
-            (*m_player)->SetIsUsingPredictor(!v);
+            auto& controls = m_player->GetControls();
+            controls.can_use_predictor = !controls.can_use_predictor;
         }
     });
 
     util::AttachKeyboardListener(VK_F6, [this](WPARAM type) {
         if (type == WM_KEYDOWN) {
-            bool v = (*m_player)->GetIsAlwaysClicking();
-            (*m_player)->SetIsAlwaysClicking(!v);
+            auto& controls = m_player->GetControls();
+            controls.can_always_click = !controls.can_always_click;
         }
     });
+    
+    m_screenshot_position.top = 316;
+    m_screenshot_position.left = 799;
 
-    m_player->SetPosition(316, 799);
+    m_is_model_thread_running = true;
+    m_model_thread = std::make_unique<std::thread>([this]() {
+        while (m_is_model_thread_running) {
+            if (m_is_model_running) {
+                m_player->Update(m_screenshot_position.top, m_screenshot_position.left);
+            } else {
+                Sleep(10);
+            }
+        }
+    });
 }
 
 void App::SetScreenshotSize(const int width, const int height) {
@@ -119,8 +127,9 @@ void App::SetScreenshotSize(const int width, const int height) {
     m_texture_height = height;
 }
 
-void App::Update() {
-    // something do to here? 
+App::~App() {
+    m_is_model_thread_running = false;
+    m_model_thread->join();
 }
 
 App::TextureWrapper App::CreateTexture(const int width, const int height) {
@@ -189,7 +198,7 @@ void App::UpdateScreenshotTexture() {
 }
 
 void App::UpdateModelTexture() {
-    uint8_t *buffer = m_player->GetResizeBuffer();
+    const uint8_t *buffer = reinterpret_cast<const uint8_t *>(m_player->GetResizeBuffer().data());
     struct {
         int x, y;
     } buffer_size, buffer_max_size; 
@@ -236,19 +245,20 @@ void App::DrawPredictions(RGBA<uint8_t>* buf, const int width, const int height,
     const RGBA<uint8_t> soft_trigger_color = {0,146,204,255}; // orange
     const RGBA<uint8_t> hard_trigger_color = {0,0,255,255}; // red
 
-    auto& player_controller = *(m_player.get());
     RGBA<uint8_t> pred_color = inactive_color;
     // if we aren't showing the filtered position, use the darker colour for the raw prediction by default
     if (!m_render_overlay_flags.filtered_pred) {
         pred_color = raw_color;
     }
-    if (player_controller->GetIsTracking()) {
+
+    const auto status = m_player->GetStatus();
+    if (status.is_tracking) {
         pred_color = track_color;
     } 
-    if (player_controller->GetIsSoftTrigger()) {
+    if (status.is_soft_trigger) {
         pred_color = soft_trigger_color;
     }
-    if (player_controller->GetIsHardTrigger()) {
+    if (status.is_hard_trigger) {
         pred_color = hard_trigger_color;
     }
 
