@@ -1,3 +1,4 @@
+#include <__msvc_chrono.hpp>
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb/stb_image_resize2.h"
 #include "SoccerPlayer.h"
@@ -27,6 +28,16 @@ SoccerPlayer::SoccerPlayer(
 
     m_has_prev_filtered_pred = false;
     m_velocity = {0.0f, 0.0f};
+    
+    m_timing_index = 0;
+    SetTimingHistoryLength(60*2);
+}
+
+void SoccerPlayer::SetTimingHistoryLength(const size_t N) {
+    m_timings.resize(N);
+    if (m_timing_index >= N) {
+        m_timing_index = N-1;
+    }
 }
 
 bool SoccerPlayer::Update(const int top, const int left) {
@@ -49,10 +60,14 @@ bool SoccerPlayer::Update(const int top, const int left) {
     const auto dt_model_end = std::chrono::high_resolution_clock::now();
     
     // Summarise timings
-    m_timings.us_image_grab = std::chrono::duration_cast<std::chrono::microseconds>(dt_grab_end-dt_grab_start).count();
-    m_timings.us_image_resize = std::chrono::duration_cast<std::chrono::microseconds>(dt_resize_end-dt_resize_start).count();
-    m_timings.us_image_convert = std::chrono::duration_cast<std::chrono::microseconds>(dt_convert_end-dt_convert_start).count();
-    m_timings.us_model_inference = std::chrono::duration_cast<std::chrono::microseconds>(dt_model_end-dt_model_start).count();
+    Timings timing;
+    timing.us_image_grab = std::chrono::duration_cast<std::chrono::microseconds>(dt_grab_end-dt_grab_start).count();
+    timing.us_image_resize = std::chrono::duration_cast<std::chrono::microseconds>(dt_resize_end-dt_resize_start).count();
+    timing.us_image_convert = std::chrono::duration_cast<std::chrono::microseconds>(dt_convert_end-dt_convert_start).count();
+    timing.us_model_inference = std::chrono::duration_cast<std::chrono::microseconds>(dt_model_end-dt_model_start).count();
+    timing.us_total = std::chrono::duration_cast<std::chrono::microseconds>(dt_model_end-dt_resize_start).count();
+    m_timings[m_timing_index] = timing;
+    m_timing_index = (m_timing_index + 1) % m_timings.size();
 
     const auto dt_prediction_delay = dt_model_end - dt_grab_end;
     const int64_t us_prediction_delay = std::chrono::duration_cast<std::chrono::microseconds>(dt_prediction_delay).count();

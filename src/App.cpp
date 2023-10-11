@@ -25,7 +25,7 @@ App::App(
         auto &p = *m_params;
         p.acceleration = 2.5f;
         p.relative_ball_width = 0.24f;
-        p.additional_model_delay = 0.0f;
+        p.input_delay_secs = 0.02f;
         p.confidence_threshold = 0.5f;
         p.max_lost_frames = 2;
 

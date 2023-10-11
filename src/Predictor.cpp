@@ -44,7 +44,7 @@ Predictor::FilteredOutput Predictor::Filter(Prediction pred, float pred_delay_se
 
     // calculate velocity
     auto &last_pred = m_last_prediction;
-    float net_delay_secs = pred_delay_secs + p.additional_model_delay;
+    float net_delay_secs = pred_delay_secs + p.input_delay_secs;
     float vx = (pred.x - last_pred.x) / dt_frame;
     float vy = (pred.y - last_pred.y) / dt_frame;
 

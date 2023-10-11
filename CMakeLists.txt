@@ -22,6 +22,7 @@ endif()
 add_executable(soccerbot 
     ${CMAKE_SOURCE_DIR}/src/main.cpp 
     ${CMAKE_SOURCE_DIR}/src/gui.cpp 
+    ${CMAKE_SOURCE_DIR}/src/gui_widgets.cpp 
     # neural network
     ${CMAKE_SOURCE_DIR}/src/TensorflowLiteModel.cpp
     ${CMAKE_SOURCE_DIR}/src/OnnxDirectMLModel.cpp

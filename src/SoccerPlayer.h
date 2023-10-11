@@ -23,6 +23,7 @@ public:
         int64_t us_image_resize = 0;
         int64_t us_image_convert = 0;
         int64_t us_model_inference = 0;
+        int64_t us_total = 0; // excludes grab time since that had additional delay limited to display refresh rate
     };
     struct Controls {
         bool can_track = false;
@@ -53,9 +54,10 @@ private:
     bool m_has_prev_filtered_pred;
     Vec2D<float> m_velocity;
 
-    Timings m_timings;
     Controls m_controls;
     Status m_status;
+    std::vector<Timings> m_timings;
+    size_t m_timing_index;
 public:
     SoccerPlayer(
         std::unique_ptr<IModel>&& model,
@@ -64,6 +66,7 @@ public:
     bool Update(const int top, const int left);
     const auto& GetResizeBuffer() const { return m_resize_buffer; }
     const auto& GetTimings() const { return m_timings; }
+    void SetTimingHistoryLength(const size_t N);
     const auto& GetStatus() const { return m_status; }
     auto& GetControls() { return m_controls; }
 

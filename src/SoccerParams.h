@@ -3,7 +3,7 @@
 struct SoccerParams {
     float acceleration;
     float relative_ball_width;
-    float additional_model_delay; 
+    float input_delay_secs; 
     float confidence_threshold;
     
     int max_lost_frames;

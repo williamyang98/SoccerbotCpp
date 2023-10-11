@@ -1,9 +1,8 @@
 #include "gui.h"
+#include "gui_widgets.h"
 #include "util/AutoGui.h"
 
 #include "imgui.h"
-#include "imgui_impl_win32.h"
-#include "imgui_impl_dx11.h"
 #include "imgui_internal.h"
 
 #include <algorithm>
@@ -63,83 +62,6 @@ void RenderControls(App &app) {
     ImGui::End(); 
 }
 
-void RenderVelocityMeter(const float value,  const float v_min, const float v_max, const ImVec2& size_arg=ImVec2(0,0)) {
-    ImGuiWindow* window = ImGui::GetCurrentWindow();
-    if (window->SkipItems)
-        return;
-
-    ImGuiContext& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
-
-    ImVec2 pos = window->DC.CursorPos;
-    ImVec2 size = ImGui::CalcItemSize(size_arg, ImGui::CalcItemWidth(), g.FontSize + style.FramePadding.y * 2.0f);
-
-    ImVec2 bb_end = pos;
-    bb_end.x += size.x;
-    bb_end.y += size.y;
-    ImRect bb(pos, bb_end);
-
-    ImGui::ItemSize(size, style.FramePadding.y);
-    if (!ImGui::ItemAdd(bb, 0))
-        return;
-
-    const float range = v_max - v_min;
-    const float range_position = value - v_min;
-    const float fraction = (range_position / range) - 0.5f;
-    
-    const auto COLOUR_RED = ImColor(255,0,0) ;
-    const auto COLOUR_GREEN = ImColor(0,255,0) ;
-    const auto color = (fraction < 0.0f) ? COLOUR_RED: COLOUR_GREEN;
-    
-    float x_start = 0.0f;
-    float x_end = 0.0f;
-    if (fraction < 0.0f) {
-        x_start = 0.5f+fraction;
-        x_end = 0.5f;
-    } else {
-        x_start = 0.5f;
-        x_end = 0.5f+fraction;
-    }
-    x_start = ImSaturate(x_start);
-    x_end = ImSaturate(x_end);
-
-    // Render
-    ImGui::RenderFrame(bb.Min, bb.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
-    bb.Expand(ImVec2(-style.FrameBorderSize, -style.FrameBorderSize));
-    ImGui::RenderRectFilledRangeH(window->DrawList, bb, color, x_start, x_end, style.FrameRounding);
-}
-
-void RenderConfidenceMeter(const float value,  const float threshold, const ImVec2& size_arg=ImVec2(0,0)) {
-    ImGuiWindow* window = ImGui::GetCurrentWindow();
-    if (window->SkipItems)
-        return;
-
-    ImGuiContext& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
-
-    ImVec2 pos = window->DC.CursorPos;
-    ImVec2 size = ImGui::CalcItemSize(size_arg, ImGui::CalcItemWidth(), g.FontSize + style.FramePadding.y * 2.0f);
-
-    ImVec2 bb_end = pos;
-    bb_end.x += size.x;
-    bb_end.y += size.y;
-    ImRect bb(pos, bb_end);
-
-    ImGui::ItemSize(size, style.FramePadding.y);
-    if (!ImGui::ItemAdd(bb, 0))
-        return;
-
-    const float fraction = ImSaturate(value);
-    const auto COLOUR_RED = ImColor(255,0,0);
-    const auto COLOUR_GREEN = ImColor(0,255,0) ;
-    const auto color = (fraction < threshold) ? COLOUR_RED: COLOUR_GREEN;
-
-    // Render
-    ImGui::RenderFrame(bb.Min, bb.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
-    bb.Expand(ImVec2(-style.FrameBorderSize, -style.FrameBorderSize));
-    ImGui::RenderRectFilledRangeH(window->DrawList, bb, color, 0.0f, fraction, style.FrameRounding);
-}
-
 void RenderAIParameters(App &app) {
     ImGui::Begin("AI Params");
 
@@ -148,7 +70,7 @@ void RenderAIParameters(App &app) {
 
     ImGui::Text("Soccer parameters");
     ImGui::SliderFloat("acceleration", &params.acceleration, 0.0f, 10.0f);
-    ImGui::SliderFloat("additional delay", &params.additional_model_delay, 0.0f, 0.5f);
+    ImGui::SliderFloat("input delay secs", &params.input_delay_secs, 0.0f, 0.5f);
     ImGui::SliderFloat("confidence threshold", &params.confidence_threshold, 0.0f, 1.0f);
     ImGui::SliderInt("max lost frames", &params.max_lost_frames, 0, 5);
 
@@ -163,17 +85,17 @@ void RenderAIParameters(App &app) {
     ImGui::Separator();
     auto raw_pred = player.GetRawPrediction();
     ImGui::Text("Confidence: %+.3f", raw_pred.confidence);
-    RenderConfidenceMeter(raw_pred.confidence, params.confidence_threshold);
+    widgets::RenderConfidenceMeter(raw_pred.confidence, params.confidence_threshold);
     ImGui::SameLine();
     ImGui::Text("confidence");
     
     ImGui::Separator();
     auto vel = player.GetVelocity();
     ImGui::Text("Velocity: x=%+.3f y=%+.3f", vel.x, vel.y);
-    RenderVelocityMeter(vel.x, -VMAX, +VMAX);
+    widgets::RenderVelocityMeter(vel.x, -VMAX, +VMAX);
     ImGui::SameLine();
     ImGui::Text("dx");
-    RenderVelocityMeter(vel.y, -VMAX, +VMAX);
+    widgets::RenderVelocityMeter(vel.y, -VMAX, +VMAX);
     ImGui::SameLine();
     ImGui::Text("dy");
     ImGui::Separator();
@@ -191,10 +113,7 @@ void RenderStatistics(App &app) {
     ImGui::Begin("Statistics");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     const auto timings = app.m_player->GetTimings();
-    ImGui::Text("Grab   : %" PRIi64 " us", timings.us_image_grab);
-    ImGui::Text("Resize : %" PRIi64 " us", timings.us_image_resize);
-    ImGui::Text("Convert: %" PRIi64 " us", timings.us_image_convert);
-    ImGui::Text("Model  : %" PRIi64 " us", timings.us_model_inference);
+    widgets::RenderTimings("Timings", timings.data(), timings.size(), ImVec2(0, 80));
     ImGui::End();
 }
 

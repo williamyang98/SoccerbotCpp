@@ -8,4 +8,4 @@ Requires python 3.9. This can be downloaded from [here](https://www.python.org/d
 
 ## Create onnx model
 1. ```python run_create_onnx.py --model-type [model_type]```
-3. Copy ``*.onnx``` model over to desired location.
+3. Copy ```*.onnx``` model over to desired location.
