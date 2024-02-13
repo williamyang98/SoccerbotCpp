@@ -12,10 +12,10 @@ set(imgui_docking_DIR ${VENDOR_DIR}/imgui_docking)
 find_package(tflitec CONFIG REQUIRED)
 find_package(imgui_docking CONFIG REQUIRED)
 
-# enable address sanitizer for debug builds in MSVC compiler
 if(MSVC)
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+    # enable address sanitizer for debug builds in MSVC compiler
+    # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
+    # set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
     add_compile_options(/MP)
 endif()
 

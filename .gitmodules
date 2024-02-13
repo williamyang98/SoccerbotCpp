@@ -23,3 +23,9 @@
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb.git
+[submodule "vendor/tflite_c"]
+	url = https://github.com/williamyang98/tflitec_cmake_package.git
+[submodule "vendor/util"]
+	url = https://github.com/williamyang98/windows_bot_util.git
+[submodule "vendor/imgui_docking"]
+	url = https://github.com/williamyang98/imgui_docking_cmake.git
