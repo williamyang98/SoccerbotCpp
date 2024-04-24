@@ -3,7 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
-#include <unordered_map>
+#include <chrono>
 
 #include <argparse/argparse.hpp>
 #include <string>
@@ -239,6 +239,11 @@ int run_app(std::unique_ptr<IModel>&& pModel) {
 
         if (done) {
             break;
+        }
+
+        if (!main_app.m_is_render_running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
         }
 
         // Start the Dear ImGui frame
