@@ -113,6 +113,13 @@ void RenderStatistics(App &app) {
     ImGui::Begin("Statistics");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     const auto timings = app.m_player->GetTimings();
+    float us_average_forward = 0.0f;
+    for (const auto& timing: timings) {
+        const float us_total = timing.us_image_resize + timing.us_image_convert + timing.us_model_inference; 
+        us_average_forward += us_total;
+    }
+    us_average_forward /= float(timings.size());
+    ImGui::Text("Forward average %.3f us/pass (%.1f FPS)", us_average_forward, 1e6f / us_average_forward);
     widgets::RenderTimings("Timings", timings.data(), timings.size(), ImVec2(0, 80));
     ImGui::End();
 }
