@@ -3,7 +3,8 @@ def get_model_types():
         "basic-small",
         "basic-medium",
         "basic-large",
-        "basic-gpu-small",
+        "gpu-small",
+        "gpu-medium",
     ]
 
 def select_model(name):
@@ -16,8 +17,11 @@ def select_model(name):
     elif name == "basic-large":
         from .model_basic_large import SoccerBotModel_Basic_Large
         return SoccerBotModel_Basic_Large
-    elif name == "basic-gpu-small":
+    elif name == "gpu-small":
         from .model_gpu_small import SoccerBotModel_Gpu_Small
         return SoccerBotModel_Gpu_Small
+    elif name == "gpu-medium":
+        from .model_gpu_medium import SoccerBotModel_Gpu_Medium
+        return SoccerBotModel_Gpu_Medium
     else:
         raise Exception(f"Invalid model type: {name}")
