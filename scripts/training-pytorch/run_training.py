@@ -1,4 +1,4 @@
-if __name__ == "__main__":
+def main():
     import argparse
     from models.select_model import get_model_types, select_model
     MODEL_TYPES = get_model_types()
@@ -21,8 +21,23 @@ if __name__ == "__main__":
     parser.add_argument("--restart-optimizer", action="store_true", help="Refreshes the optimizer from specified value.")
     parser.add_argument("--reset-loss", action="store_true", help="Sets the best loss to infinite so we start autosaving new models.")
     parser.add_argument("--disable-lr-anneal", action="store_true", help="Disables learning rate reduction after training stalls.")
+    parser.add_argument("--directml-device-id", default=0, type=int, help="Index of directml device to use")
+    parser.add_argument("--directml-list-devices", action="store_true", help="Lists directml devices")
     args = parser.parse_args()
-    
+
+    # list devices
+    if args.directml_list_devices:
+        import torch_directml
+        total_devices = torch_directml.device_count()
+        if total_devices == 0:
+            print("No directml devices")
+        else:
+            print(f"Directml devices ({total_devices})")
+            for i in range(total_devices):
+                name = torch_directml.device_name(i)
+                print(f"- {i}: {name}")
+        return
+
     # validate paths
     import os
     import sys
@@ -39,7 +54,7 @@ if __name__ == "__main__":
         TOTAL_DATA_THREADS = multiprocessing.cpu_count()
     print(f"Using {TOTAL_DATA_THREADS} threads for data loading")
     pathlib.Path(os.path.dirname(PATH_MODEL_OUT)).mkdir(parents=True, exist_ok=True)
-        
+
     # create generator
     sys.path.append("../")
     from generator import GeneratorConfig, BasicSampleGenerator
@@ -57,12 +72,12 @@ if __name__ == "__main__":
     image, bounding_box, has_ball = generator.create_sample()
     im_original_width, im_original_height = image.size
     im_channels = 3
-    
+
     # load training device
     import torch
     if args.device == "directml":
         import torch_directml
-        DEVICE = torch_directml.device()
+        DEVICE = torch_directml.device(args.directml_device_id)
     else:
         DEVICE = torch.device(args.device)
 
@@ -382,4 +397,5 @@ if __name__ == "__main__":
 
     dataset.stop()
 
-    
+if __name__ == "__main__":
+    main()
